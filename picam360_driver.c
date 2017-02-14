@@ -39,29 +39,29 @@ int xmp(char *buff, int buff_len) {
 	buff[xmp_len++] = 0xE1;
 	buff[xmp_len++] = 0; // size MSB
 	buff[xmp_len++] = 0; // size LSB
-	xmp_len += sprintf(inj + xmp_len, "http://ns.adobe.com/xap/1.0/");
+	xmp_len += sprintf(buff + xmp_len, "http://ns.adobe.com/xap/1.0/");
 	buff[xmp_len++] = '\0';
-	xmp_len += sprintf(inj + xmp_len, "<?xpacket begin=\"﻿");
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket begin=\"﻿");
 	buff[xmp_len++] = 0xEF;
 	buff[xmp_len++] = 0xBB;
 	buff[xmp_len++] = 0xBF;
-	xmp_len += sprintf(inj + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
+	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
 	xmp_len +=
-			sprintf(inj + xmp_len,
+			sprintf(buff + xmp_len,
 					"<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-drive rev1\">");
 	xmp_len +=
-			sprintf(inj + xmp_len,
+			sprintf(buff + xmp_len,
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len +=
-			sprintf(inj + xmp_len,
+			sprintf(buff + xmp_len,
 					"<rdf:Description rdf:about=\"\">");
-	xmp_len += sprintf(inj + xmp_len,
+	xmp_len += sprintf(buff + xmp_len,
 					"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
 					quat[0], quat[1], quat[2], quat[3]);
-	xmp_len += sprintf(inj + xmp_len, "</rdf:Description>");
-	xmp_len += sprintf(inj + xmp_len, "</rdf:RDF>");
-	xmp_len += sprintf(inj + xmp_len, "</x:xmpmeta>");
-	xmp_len += sprintf(inj + xmp_len, "<?xpacket end=\"w\"?>");
+	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
+	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
+	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
+	xmp_len += sprintf(buff + xmp_len, "<?xpacket end=\"w\"?>");
 	buff[xmp_len++] = '\0';
 	buff[2] = ((xmp_len - 2) >> 8) & 0xFF; // size MSB
 	buff[3] = (xmp_len - 2) & 0xFF; // size LSB
