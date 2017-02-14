@@ -24,10 +24,11 @@ static float lg_quat[4];
 
 float *get_quatanion_mpu9250() {
 	ms_update();
-	lg_quat[0] = quatanion[1];
-	lg_quat[1] = quatanion[3];
-	lg_quat[2] = -quatanion[2];
-	lg_quat[3] = quatanion[0];
+	//convert from mpu coodinate to opengl coodinate
+	lg_quat[0] = quatanion[1];//x
+	lg_quat[1] = quatanion[3];//y : swap y and z
+	lg_quat[2] = -quatanion[2];//z : swap y and z
+	lg_quat[3] = quatanion[0];//w
 	return lg_quat;
 }
 
