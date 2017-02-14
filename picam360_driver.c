@@ -18,17 +18,14 @@ bool init() {
 	return true;
 }
 
-//0:x, 1:y, 2:z, 3:w
-//opengl coordinate
 static float lg_quat[4];
 
 float *get_quatanion_mpu9250() {
 	ms_update();
-	//convert from mpu coodinate to opengl coodinate
-	lg_quat[0] = quatanion[1];//x
-	lg_quat[1] = quatanion[3];//y : swap y and z
-	lg_quat[2] = -quatanion[2];//z : swap y and z
-	lg_quat[3] = quatanion[0];//w
+	lg_quat[0] = quatanion[0];
+	lg_quat[1] = quatanion[1];
+	lg_quat[2] = -quatanion[2];
+	lg_quat[3] = quatanion[3];
 	return lg_quat;
 }
 
@@ -59,7 +56,7 @@ int xmp(char *buff, int buff_len) {
 			sprintf(buff + xmp_len,
 					"<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-					"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
+					"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
 					quat[0], quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
