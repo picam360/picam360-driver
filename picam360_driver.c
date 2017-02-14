@@ -18,10 +18,21 @@ bool init() {
 	return true;
 }
 
+static float lg_quat[4];
+
+float *get_quatanion_mpu9250() {
+	ms_update();
+	lg_quat[0] = -quatanion[1];
+	lg_quat[1] = -quatanion[3];
+	lg_quat[2] = quatanion[2];
+	lg_quat[3] = quatanion[0];
+	return lg_quat;
+}
+
 int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
-	ms_update();
+	float *quat = get_quatanion_mpu9250();
 
 	xmp_len = 0;
 	buff[xmp_len++] = 0xFF;
@@ -46,7 +57,7 @@ int xmp(char *buff, int buff_len) {
 					"<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(inj + xmp_len,
 					"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
-					quatanion[0], quatanion[1], quatanion[2], quatanion[3]);
+					quat[0], quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(inj + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(inj + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(inj + xmp_len, "</x:xmpmeta>");
