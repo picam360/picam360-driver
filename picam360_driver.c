@@ -18,14 +18,16 @@ bool init() {
 	return true;
 }
 
+//0:w, 1:x, 2:y, 3:z
+//opengl coordinate
 static float lg_quat[4];
 
 float *get_quatanion_mpu9250() {
 	ms_update();
-	lg_quat[0] = quatanion[0];
-	lg_quat[1] = quatanion[1];
-	lg_quat[2] = quatanion[2];
-	lg_quat[3] = quatanion[3];
+	lg_quat[0] = quatanion[1];
+	lg_quat[1] = quatanion[3];
+	lg_quat[2] = -quatanion[2];
+	lg_quat[3] = quatanion[0];
 	return lg_quat;
 }
 
