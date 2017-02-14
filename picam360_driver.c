@@ -56,8 +56,8 @@ int xmp(char *buff, int buff_len) {
 			sprintf(buff + xmp_len,
 					"<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-					"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
-					quat[3], quat[0], quat[1], quat[2]);
+					"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+					quat[0], quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
