@@ -18,7 +18,7 @@ bool init() {
 	return true;
 }
 
-//0:w, 1:x, 2:y, 3:z
+//0:x, 1:y, 2:z, 3:w
 //opengl coordinate
 static float lg_quat[4];
 
@@ -59,7 +59,7 @@ int xmp(char *buff, int buff_len) {
 			sprintf(buff + xmp_len,
 					"<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-					"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
+					"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
 					quat[0], quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
