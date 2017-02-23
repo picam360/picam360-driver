@@ -88,10 +88,50 @@ void *transmit_thread_func(void* arg) {
 
 void *recieve_thread_func(void* arg) {
 	int buff_size = 4096;
-	char buff[buff_size];
+	unsigned char *buff = malloc(buff_size);
+	unsigned char *buff_trash = malloc(buff_size);
+	int data_len = 0;
+	int marker = 0;
+	int file_fd = STDIN_FILENO;
+	bool xmp = false;
+	char *buff_xmp = NULL;
+	int xmp_len = 0;
+	int xmp_idx = 0;
+
 	while (1) {
-		int len = read(STDIN_FILENO, buff, buff_size);
-		perror(buff);
+		data_len = read(file_fd, buff, buff_size);
+		for (int i = 0; i < data_len; i++) {
+			if (xmp) {
+				if (xmp_idx == 0) {
+					xmp_len = ((unsigned char*) buff)[i] << 8;
+				} else if (xmp_idx == 1) {
+					xmp_len += ((unsigned char*) buff)[i];
+					buff_xmp = malloc(xmp_len);
+					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
+					buff_xmp[1] = (xmp_len) & 0xFF;
+				} else {
+					buff_xmp[xmp_idx] = buff[i];
+				}
+				xmp_idx++;
+				if (xmp_idx >= xmp_len) {
+					char *xml = buff_xmp + strlen(buff_xmp) + 1;
+
+					xmp = false;
+					free(buff_xmp);
+					buff_xmp = NULL;
+				}
+			}
+			if (marker) {
+				marker = 0;
+				if (buff[i] == 0xE1) { //APP1
+					xmp = true;
+					xmp_len = 0;
+					xmp_idx = 0;
+				}
+			} else if (buff[i] == 0xFF) {
+				marker = 1;
+			}
+		}
 	}
 }
 
@@ -104,7 +144,7 @@ int main(int argc, char *argv[]) {
 	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
 
 	//wait exit command
-	pthread_join(&recieve_thread);
+	pthread_join(recieve_thread, NULL);
 
 	return 0;
 }
