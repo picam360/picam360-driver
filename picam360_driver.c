@@ -52,12 +52,10 @@ int xmp(char *buff, int buff_len) {
 	xmp_len +=
 			sprintf(buff + xmp_len,
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<rdf:Description rdf:about=\"\">");
+	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-					"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />",
-					quat[0], quat[1], quat[2], quat[3]);
+			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
+			quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -69,7 +67,7 @@ int xmp(char *buff, int buff_len) {
 	return xmp_len;
 }
 
-int main(int argc, char *argv[]) {
+void *transmit_thread_func(void* arg) {
 	bool succeeded;
 
 	succeeded = init();
@@ -81,12 +79,32 @@ int main(int argc, char *argv[]) {
 	int buff_size = 4096;
 	char buff[buff_size];
 	while (1) {
-
 		xmp_len = xmp(buff, buff_size);
 		write(STDOUT_FILENO, buff, xmp_len);
 
 		usleep(10 * 1000); //less than 100Hz
 	}
+}
+
+void *recieve_thread_func(void* arg) {
+	int buff_size = 4096;
+	char buff[buff_size];
+	while (1) {
+		int len = read(STDIN_FILENO, buff, buff_size);
+		perror(buff);
+	}
+}
+
+int main(int argc, char *argv[]) {
+
+	pthread_t transmit_thread;
+	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
+
+	pthread_t recieve_thread;
+	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
+
+	//wait exit command
+	pthread_join(&recieve_thread);
 
 	return 0;
 }
