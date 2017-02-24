@@ -14,6 +14,9 @@
 #include "picam360_driver.h"
 #include "MotionSensor.h"
 
+#define MOTOR_CENTER 0.0744
+#define MOTOR_RANGE 0.005
+
 bool init() {
 	ms_open();
 	return true;
@@ -132,6 +135,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "light0_value=\"%f\"", &value);
+							value = MIN(MAX(value, 0), 100);
+							value = pow(value / 100, 3);
 							len = sprintf(cmd, "%d=%f\n", light0_id, value);
 							write(fd, cmd, len);
 						}
@@ -142,6 +147,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "light1_value=\"%f\"", &value);
+							value = MIN(MAX(value, 0), 100);
+							value = pow(value / 100, 3);
 							len = sprintf(cmd, "%d=%f\n", light1_id, value);
 							write(fd, cmd, len);
 						}
@@ -152,6 +159,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "motor0_value=\"%f\"", &value);
+							value = MIN(MAX(value, -100), 100);
+							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
 							len = sprintf(cmd, "%d=%f\n", motor0_id, value);
 							write(fd, cmd, len);
 						}
@@ -162,6 +171,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "motor1_value=\"%f\"", &value);
+							value = MIN(MAX(value, -100), 100);
+							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
 							len = sprintf(cmd, "%d=%f\n", motor1_id, value);
 							write(fd, cmd, len);
 						}
@@ -172,6 +183,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "motor2_value=\"%f\"", &value);
+							value = MIN(MAX(value, -100), 100);
+							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
 							len = sprintf(cmd, "%d=%f\n", motor2_id, value);
 							write(fd, cmd, len);
 						}
@@ -182,6 +195,8 @@ void *recieve_thread_func(void* arg) {
 							float value;
 							int len;
 							sscanf(value_str, "motor3_value=\"%f\"", &value);
+							value = MIN(MAX(value, -100), 100);
+							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
 							len = sprintf(cmd, "%d=%f\n", motor3_id, value);
 							write(fd, cmd, len);
 						}
