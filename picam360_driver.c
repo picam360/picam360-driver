@@ -114,11 +114,25 @@ void *recieve_thread_func(void* arg) {
 				}
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
+					int light_id = 34;
+					int fd = open("/dev/pi-blaster", O_RDWR);
 					char *xml = buff_xmp + strlen(buff_xmp) + 1;
+
+					char *value_str;
+					value_str = strstr(xml, "light_value=");
+					if (value_str) {
+						char cmd[256];
+						float value;
+						sscanf(q_str, "light_value=\"%f\"", &value);
+						int len = sprintf(cmd, "%d=%f\n", light_id, value);
+						int len2 = write(fd, buf, len);
+					}
 
 					xmp = false;
 					free(buff_xmp);
 					buff_xmp = NULL;
+
+					close(fd);
 				}
 			}
 			if (marker) {
