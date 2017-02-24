@@ -126,62 +126,62 @@ void *recieve_thread_func(void* arg) {
 
 						char *value_str;
 
-						value_str = strstr(xml, "light_value0=");
+						value_str = strstr(xml, "light0_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "light_value0=\"%f\"", &value);
+							sscanf(value_str, "light0_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", light0_id, value);
 							write(fd, cmd, len);
 						}
 
-						value_str = strstr(xml, "light_value1=");
+						value_str = strstr(xml, "light1_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "light_value1=\"%f\"", &value);
+							sscanf(value_str, "light1_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", light1_id, value);
 							write(fd, cmd, len);
 						}
 
-						value_str = strstr(xml, "motor_value0=");
+						value_str = strstr(xml, "motor0_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "motor_value0=\"%f\"", &value);
+							sscanf(value_str, "motor0_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", motor0_id, value);
 							write(fd, cmd, len);
 						}
 
-						value_str = strstr(xml, "motor_value1=");
+						value_str = strstr(xml, "motor1_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "motor_value1=\"%f\"", &value);
+							sscanf(value_str, "motor1_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", motor1_id, value);
 							write(fd, cmd, len);
 						}
 
-						value_str = strstr(xml, "motor_value2=");
+						value_str = strstr(xml, "motor2_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "motor_value2=\"%f\"", &value);
+							sscanf(value_str, "motor2_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", motor2_id, value);
 							write(fd, cmd, len);
 						}
 
-						value_str = strstr(xml, "motor_value3=");
+						value_str = strstr(xml, "motor3_value=");
 						if (value_str) {
 							char cmd[256];
 							float value;
 							int len;
-							sscanf(value_str, "motor_value3=\"%f\"", &value);
+							sscanf(value_str, "motor3_value=\"%f\"", &value);
 							len = sprintf(cmd, "%d=%f\n", motor3_id, value);
 							write(fd, cmd, len);
 						}
