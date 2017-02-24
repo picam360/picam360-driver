@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "picam360_driver.h"
 #include "MotionSensor.h"
@@ -89,7 +90,6 @@ void *transmit_thread_func(void* arg) {
 void *recieve_thread_func(void* arg) {
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
-	unsigned char *buff_trash = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
 	int file_fd = STDIN_FILENO;
@@ -124,9 +124,9 @@ void *recieve_thread_func(void* arg) {
 						if (value_str) {
 							char cmd[256];
 							float value;
-							sscanf(q_str, "light_value=\"%f\"", &value);
+							sscanf(value_str, "light_value=\"%f\"", &value);
 							int len = sprintf(cmd, "%d=%f\n", light_id, value);
-							int len2 = write(fd, buf, len);
+							int len2 = write(fd, cmd, len);
 						}
 
 						xmp = false;
@@ -149,6 +149,7 @@ void *recieve_thread_func(void* arg) {
 			}
 		}
 	}
+	free(buff);
 }
 
 int main(int argc, char *argv[]) {
