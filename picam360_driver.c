@@ -18,7 +18,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define MOTOR_CENTER 0.0744
+#define MOTOR_CENTER 0.0737
 #define MOTOR_RANGE 0.005
 
 static float lg_quat[4];

@@ -3,6 +3,10 @@ CAMERA_HEIGHT=2048
 #CAMERA_WIDTH=1440
 #CAMERA_HEIGHT=1440
 
+sudo killall socat
+sudo killall raspivid
+sudo killall picam360-driver.bin
+
 # cam0
 /usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs 0 -b 8000000 -o - | /usr/bin/socat - UDP-DATAGRAM:192.168.4.2:9100 &
 #/usr/bin/raspivid -ih -t 0 -ex sports -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 30 -cs 0 -b 2000000 -o - | /usr/bin/socat - UDP-DATAGRAM:192.168.4.2:9100 &
