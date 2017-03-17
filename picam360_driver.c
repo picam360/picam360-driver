@@ -19,7 +19,9 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define MOTOR_CENTER 0.0737
+#define MOTOR_MERGIN 0.0013
 #define MOTOR_RANGE 0.005
+#define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
 static float lg_quat[4];
 static int lg_light0_id = 4;
@@ -201,7 +203,7 @@ void *recieve_thread_func(void* arg) {
 								lg_motor_value[0] = value;
 
 								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_CENTER;
+										+ MOTOR_BASE(value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor0_id,
 										value);
 								write(fd, cmd, len);
@@ -219,7 +221,7 @@ void *recieve_thread_func(void* arg) {
 								lg_motor_value[1] = value;
 
 								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_CENTER;
+										+ MOTOR_BASE(value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor1_id,
 										value);
 								write(fd, cmd, len);
@@ -237,7 +239,7 @@ void *recieve_thread_func(void* arg) {
 								lg_motor_value[2] = value;
 
 								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_CENTER;
+										+ MOTOR_BASE(value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor2_id,
 										value);
 								write(fd, cmd, len);
@@ -255,7 +257,7 @@ void *recieve_thread_func(void* arg) {
 								lg_motor_value[3] = value;
 
 								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_CENTER;
+										+ MOTOR_BASE(value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor3_id,
 										value);
 								write(fd, cmd, len);
