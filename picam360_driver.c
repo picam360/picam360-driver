@@ -29,6 +29,9 @@ static int lg_motor1_id = 18;
 static int lg_motor2_id = 35;
 static int lg_motor3_id = 36;
 
+static int lg_light_value[LIGHT_NUM] = { 0, 0 };
+static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+
 bool init() {
 	ms_open();
 	int fd = open("/dev/pi-blaster", O_WRONLY);
@@ -158,9 +161,14 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "light0_value=\"%f\"", &value);
 							value = MIN(MAX(value, 0), 100);
-							value = pow(value / 100, 3);
-							len = sprintf(cmd, "%d=%f\n", lg_light0_id, value);
-							write(fd, cmd, len);
+							if (value != lg_light_value[0]) {
+								lg_light_value[0] = value;
+
+								value = pow(value / 100, 3);
+								len = sprintf(cmd, "%d=%f\n", lg_light0_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						value_str = strstr(xml, "light1_value=");
@@ -170,9 +178,14 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "light1_value=\"%f\"", &value);
 							value = MIN(MAX(value, 0), 100);
-							value = pow(value / 100, 3);
-							len = sprintf(cmd, "%d=%f\n", lg_light1_id, value);
-							write(fd, cmd, len);
+							if (value != lg_light_value[1]) {
+								lg_light_value[1] = value;
+
+								value = pow(value / 100, 3);
+								len = sprintf(cmd, "%d=%f\n", lg_light1_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						value_str = strstr(xml, "motor0_value=");
@@ -182,9 +195,15 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "motor0_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
-							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", lg_motor0_id, value);
-							write(fd, cmd, len);
+							if (value != lg_motor_value[0]) {
+								lg_motor_value[0] = value;
+
+								value = (value / 100) * MOTOR_RANGE
+										+ MOTOR_CENTER;
+								len = sprintf(cmd, "%d=%f\n", lg_motor0_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						value_str = strstr(xml, "motor1_value=");
@@ -194,9 +213,15 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "motor1_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
-							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", lg_motor1_id, value);
-							write(fd, cmd, len);
+							if (value != lg_motor_value[1]) {
+								lg_motor_value[1] = value;
+
+								value = (value / 100) * MOTOR_RANGE
+										+ MOTOR_CENTER;
+								len = sprintf(cmd, "%d=%f\n", lg_motor1_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						value_str = strstr(xml, "motor2_value=");
@@ -206,9 +231,15 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "motor2_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
-							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", lg_motor2_id, value);
-							write(fd, cmd, len);
+							if (value != lg_motor_value[2]) {
+								lg_motor_value[2] = value;
+
+								value = (value / 100) * MOTOR_RANGE
+										+ MOTOR_CENTER;
+								len = sprintf(cmd, "%d=%f\n", lg_motor2_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						value_str = strstr(xml, "motor3_value=");
@@ -218,9 +249,15 @@ void *recieve_thread_func(void* arg) {
 							int len;
 							sscanf(value_str, "motor3_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
-							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", lg_motor3_id, value);
-							write(fd, cmd, len);
+							if (value != lg_motor_value[3]) {
+								lg_motor_value[3] = value;
+
+								value = (value / 100) * MOTOR_RANGE
+										+ MOTOR_CENTER;
+								len = sprintf(cmd, "%d=%f\n", lg_motor3_id,
+										value);
+								write(fd, cmd, len);
+							}
 						}
 
 						xmp = false;
