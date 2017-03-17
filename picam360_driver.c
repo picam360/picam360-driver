@@ -29,6 +29,8 @@ static int lg_motor1_id = 18;
 static int lg_motor2_id = 35;
 static int lg_motor3_id = 36;
 
+#define LIGHT_NUM 2
+#define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 
