@@ -10,19 +10,47 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <math.h>
 
 #include "picam360_driver.h"
 #include "MotionSensor.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define MOTOR_CENTER 0.0744
 #define MOTOR_RANGE 0.005
 
+static float lg_quat[4];
+static int lg_light0_id = 4;
+static int lg_light1_id = 34;
+static int lg_motor0_id = 17;
+static int lg_motor1_id = 18;
+static int lg_motor2_id = 35;
+static int lg_motor3_id = 36;
+
 bool init() {
 	ms_open();
+	int fd = open("/dev/pi-blaster", O_WRONLY);
+	if (fd > 0) {
+		char cmd[256];
+		int len;
+		len = sprintf(cmd, "%d=%f\n", lg_light0_id, 0);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_light1_id, 0);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor0_id, MOTOR_CENTER);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor1_id, MOTOR_CENTER);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor2_id, MOTOR_CENTER);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor3_id, MOTOR_CENTER);
+		write(fd, cmd, len);
+		close(fd);
+	}
 	return true;
 }
-
-static float lg_quat[4];
 
 float *get_quatanion_mpu9250() {
 	ms_update();
@@ -117,12 +145,6 @@ void *recieve_thread_func(void* arg) {
 				}
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
-					int light0_id = 4;
-					int light1_id = 34;
-					int motor0_id = 17;
-					int motor1_id = 18;
-					int motor2_id = 35;
-					int motor3_id = 36;
 					int fd = open("/dev/pi-blaster", O_WRONLY);
 					if (fd > 0) {
 						char *xml = buff_xmp + strlen(buff_xmp) + 1;
@@ -137,7 +159,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "light0_value=\"%f\"", &value);
 							value = MIN(MAX(value, 0), 100);
 							value = pow(value / 100, 3);
-							len = sprintf(cmd, "%d=%f\n", light0_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_light0_id, value);
 							write(fd, cmd, len);
 						}
 
@@ -149,7 +171,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "light1_value=\"%f\"", &value);
 							value = MIN(MAX(value, 0), 100);
 							value = pow(value / 100, 3);
-							len = sprintf(cmd, "%d=%f\n", light1_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_light1_id, value);
 							write(fd, cmd, len);
 						}
 
@@ -161,7 +183,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "motor0_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
 							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", motor0_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_motor0_id, value);
 							write(fd, cmd, len);
 						}
 
@@ -173,7 +195,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "motor1_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
 							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", motor1_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_motor1_id, value);
 							write(fd, cmd, len);
 						}
 
@@ -185,7 +207,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "motor2_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
 							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", motor2_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_motor2_id, value);
 							write(fd, cmd, len);
 						}
 
@@ -197,7 +219,7 @@ void *recieve_thread_func(void* arg) {
 							sscanf(value_str, "motor3_value=\"%f\"", &value);
 							value = MIN(MAX(value, -100), 100);
 							value = (value / 100) * MOTOR_RANGE + MOTOR_CENTER;
-							len = sprintf(cmd, "%d=%f\n", motor3_id, value);
+							len = sprintf(cmd, "%d=%f\n", lg_motor3_id, value);
 							write(fd, cmd, len);
 						}
 
