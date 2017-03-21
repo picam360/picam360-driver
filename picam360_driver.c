@@ -26,10 +26,10 @@
 static float lg_quat[4];
 static int lg_light0_id = 4;
 static int lg_light1_id = 34;
-static int lg_motor0_id = 17;
-static int lg_motor1_id = 18;
+static int lg_motor0_id = 18;
+static int lg_motor1_id = 36;
 static int lg_motor2_id = 35;
-static int lg_motor3_id = 36;
+static int lg_motor3_id = 17;
 
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
