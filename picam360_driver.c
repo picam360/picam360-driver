@@ -35,6 +35,7 @@ static int lg_motor3_id = 17;
 #define MOTOR_NUM 4
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static float lg_dir[4] = { -1, 1, -1, 1 };
 
 bool init() {
 	ms_open();
@@ -202,8 +203,8 @@ void *recieve_thread_func(void* arg) {
 							if (value != lg_motor_value[0]) {
 								lg_motor_value[0] = value;
 
-								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(value);
+								value = lg_dir[0] * (value / 100) * MOTOR_RANGE
+										+ MOTOR_BASE(lg_dir[0] * value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor0_id,
 										value);
 								write(fd, cmd, len);
@@ -220,8 +221,8 @@ void *recieve_thread_func(void* arg) {
 							if (value != lg_motor_value[1]) {
 								lg_motor_value[1] = value;
 
-								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(value);
+								value = lg_dir[1] * (value / 100) * MOTOR_RANGE
+										+ MOTOR_BASE(lg_dir[1] * value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor1_id,
 										value);
 								write(fd, cmd, len);
@@ -238,8 +239,8 @@ void *recieve_thread_func(void* arg) {
 							if (value != lg_motor_value[2]) {
 								lg_motor_value[2] = value;
 
-								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(value);
+								value = lg_dir[2] * (value / 100) * MOTOR_RANGE
+										+ MOTOR_BASE(lg_dir[2] * value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor2_id,
 										value);
 								write(fd, cmd, len);
@@ -256,8 +257,8 @@ void *recieve_thread_func(void* arg) {
 							if (value != lg_motor_value[3]) {
 								lg_motor_value[3] = value;
 
-								value = (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(value);
+								value = lg_dir[3] * (value / 100) * MOTOR_RANGE
+										+ MOTOR_BASE(lg_dir[3] * value);
 								len = sprintf(cmd, "%d=%f\n", lg_motor3_id,
 										value);
 								write(fd, cmd, len);
