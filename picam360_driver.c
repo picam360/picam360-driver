@@ -23,6 +23,11 @@
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
+static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
+//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
+static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
+//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static float lg_compass[4] = { };
 static float lg_quat[4];
 static int lg_light0_id = 4;
 static int lg_light1_id = 34;
@@ -60,19 +65,38 @@ bool init() {
 	return true;
 }
 
-float *get_quatanion_mpu9250() {
-	ms_update();
-	lg_quat[0] = quatanion[0];
-	lg_quat[1] = quatanion[1];
-	lg_quat[2] = quatanion[2];
-	lg_quat[3] = quatanion[3];
-	return lg_quat;
-}
-
 int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
-	float *quat = get_quatanion_mpu9250();
+	ms_update();
+	{
+		lg_quat[0] = quatanion[0];
+		lg_quat[1] = quatanion[1];
+		lg_quat[2] = quatanion[2];
+		lg_quat[3] = quatanion[3];
+	}
+
+	{ //compas : calibration
+		float calib[3];
+		float bias[3];
+		float gain[3];
+		for (int i = 0; i < 3; i++) {
+			lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+			lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
+		}
+		float norm = sqrt(
+				calib[0] * calib[0] + calib[1] * calib[1]
+						+ calib[2] * calib[2]);
+		for (int i = 0; i < 3; i++) {
+			calib[i] /= norm;
+		}
+		lg_compass[0] = calib[0];
+		lg_compass[1] = calib[1];
+		lg_compass[2] = calib[2];
+	}
 
 	xmp_len = 0;
 	buff[xmp_len++] = 0xFF;
@@ -94,13 +118,11 @@ int xmp(char *buff, int buff_len) {
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
-			quat[1], quat[2], quat[3]);
-	xmp_len += sprintf(buff + xmp_len,
-			"<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-			compass[0], compass[1], compass[2]);
-	xmp_len += sprintf(buff + xmp_len,
-			"<temperature v=\"%f\" />", temp);
+			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", lg_quat[0],
+			lg_quat[1], lg_quat[2], lg_quat[3]);
+	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
+			lg_compass[0], lg_compass[1], lg_compass[2]);
+	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
