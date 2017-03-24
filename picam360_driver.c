@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
+#include <limits.h>
 
 #include "picam360_driver.h"
 #include "MotionSensor.h"
@@ -23,9 +24,9 @@
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
+static float lg_compass_min[3] = { -708.000000,-90.000000,-173.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
-static float lg_compass_max[3] = { 221.000000, -67.000000, 98.000000 };
+static float lg_compass_max[3] = { -47.000000,536.000000,486.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
 static float lg_quat[4];
@@ -87,6 +88,13 @@ int xmp(char *buff, int buff_len) {
 			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
 			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
 		}
+
+		//fprintf(stderr, "%f,%f,%f:%f,%f,%f:%f,%f,%f\n",
+		//compass[0],compass[1],compass[2],
+		//lg_compass_min[0],lg_compass_min[1],lg_compass_min[2],
+		//lg_compass_max[0],lg_compass_max[1],lg_compass_max[2]
+		//);
+
 		float norm = sqrt(
 				calib[0] * calib[0] + calib[1] * calib[1]
 						+ calib[2] * calib[2]);
