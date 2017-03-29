@@ -158,10 +158,10 @@ void *transmit_thread_func(void* arg) {
 	}
 	int xmp_len = 0;
 	int buff_size = RTP_MAXPACKETSIZE;
-	unsigned char buff[RTP_MAXPACKETSIZE];
+	char buff[RTP_MAXPACKETSIZE];
 	while (1) {
 		xmp_len = xmp(buff, buff_size);
-		rtp_sendpacket(buff, xmp_len, PT_STATUS);
+		rtp_sendpacket((unsigned char*)buff, xmp_len, PT_STATUS);
 
 		usleep(10 * 1000); //less than 100Hz
 	}
@@ -341,12 +341,13 @@ static int rtp_callback(unsigned char *data, int data_len, int pt) {
 		return -1;
 	}
 	write(fd, data, data_len);
+	return 0;
 }
 
 int main(int argc, char *argv[]) {
 
 	lg_cmd_fd = open("cmd", O_WRONLY);
-	rtp_set_callback(rtp_callback);
+	rtp_set_callback((RTP_CALLBACK)rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
 	init_video();
