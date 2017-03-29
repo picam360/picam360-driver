@@ -50,7 +50,7 @@ static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_dir[4] = { -1, 1, -1, 1 };
 
-bool init() {
+bool init_pwm() {
 	ms_open();
 	int fd = open("/dev/pi-blaster", O_WRONLY);
 	if (fd > 0) {
@@ -150,19 +150,12 @@ int xmp(char *buff, int buff_len) {
 }
 
 void *transmit_thread_func(void* arg) {
-	bool succeeded;
-
-	succeeded = init();
-	if (!succeeded) {
-		perror("An error happen in init().");
-		exit(-1);
-	}
 	int xmp_len = 0;
 	int buff_size = RTP_MAXPACKETSIZE;
 	char buff[RTP_MAXPACKETSIZE];
 	while (1) {
 		xmp_len = xmp(buff, buff_size);
-		rtp_sendpacket((unsigned char*)buff, xmp_len, PT_STATUS);
+		rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
 
 		usleep(10 * 1000); //less than 100Hz
 	}
@@ -173,13 +166,17 @@ void *recieve_thread_func(void* arg) {
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
+	int fd = open("cmd", O_RDONLY);
+	if (fd < 0) {
+		return NULL;
+	}
 	bool xmp = false;
 	char *buff_xmp = NULL;
 	int xmp_len = 0;
 	int xmp_idx = 0;
 
 	while (1) {
-		data_len = read(lg_cmd_fd, buff, buff_size);
+		data_len = read(fd, buff, buff_size);
 		for (int i = 0; i < data_len; i++) {
 			if (xmp) {
 				if (xmp_idx == 0) {
@@ -332,6 +329,9 @@ void *recieve_thread_func(void* arg) {
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
 	int fd = -1;
 	if (pt == PT_CMD) {
+		if (lg_cmd_fd < 0) {
+			lg_cmd_fd = open("cmd", O_WRONLY | O_NONBLOCK);
+		}
 		fd = lg_cmd_fd;
 	}
 	if (fd < 0) {
@@ -342,15 +342,18 @@ static int rtp_callback(unsigned char *data, int data_len, int pt) {
 }
 
 int main(int argc, char *argv[]) {
+	bool succeeded;
 
-	lg_cmd_fd = open("cmd", O_RDWR);
-	if (lg_cmd_fd < 0) {
-		return -1;
-	}
-	rtp_set_callback((RTP_CALLBACK)rtp_callback);
+	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
 	init_video();
+
+	succeeded = init_pwm();
+	if (!succeeded) {
+		perror("An error happen in init_pwm().");
+		exit(-1);
+	}
 
 	pthread_t transmit_thread;
 	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
