@@ -24,8 +24,7 @@
 
 #define PT_STATUS 100
 #define PT_CMD 101
-int lg_cmd_rd_fd = -1;
-int lg_cmd_wr_fd = -1;
+int lg_cmd_fd = -1;
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
@@ -180,7 +179,7 @@ void *recieve_thread_func(void* arg) {
 	int xmp_idx = 0;
 
 	while (1) {
-		data_len = read(file_fd, buff, buff_size);
+		data_len = read(lg_cmd_fd, buff, buff_size);
 		for (int i = 0; i < data_len; i++) {
 			if (xmp) {
 				if (xmp_idx == 0) {
@@ -333,7 +332,7 @@ void *recieve_thread_func(void* arg) {
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
 	int fd = -1;
 	if (pt == PT_CMD) {
-		fd = lg_cmd_wr_fd;
+		fd = lg_cmd_fd;
 	}
 	if (fd < 0) {
 		return -1;
@@ -344,12 +343,8 @@ static int rtp_callback(unsigned char *data, int data_len, int pt) {
 
 int main(int argc, char *argv[]) {
 
-	lg_cmd_rd_fd = open("cmd", O_RDONLY);
-	if (lg_cmd_rd_fd < 0) {
-		return -1;
-	}
-	lg_cmd_wr_fd = open("cmd", O_WRONLY);
-	if (lg_cmd_wr_fd < 0) {
+	lg_cmd_fd = open("cmd", O_RDWR);
+	if (lg_cmd_fd < 0) {
 		return -1;
 	}
 	rtp_set_callback((RTP_CALLBACK)rtp_callback);
