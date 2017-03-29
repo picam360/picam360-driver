@@ -16,17 +16,23 @@
 #include "picam360_driver.h"
 #include "MotionSensor.h"
 
+#include "rtp.h"
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define PT_STATUS 100
+#define PT_CMD 101
+int lg_cmd_fd = -1;
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-static float lg_compass_min[3] = { -708.000000,-90.000000,-173.000000 };
+static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
-static float lg_compass_max[3] = { -47.000000,536.000000,486.000000 };
+static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
 static float lg_quat[4];
@@ -151,11 +157,11 @@ void *transmit_thread_func(void* arg) {
 		exit(-1);
 	}
 	int xmp_len = 0;
-	int buff_size = 4096;
-	char buff[buff_size];
+	int buff_size = RTP_MAXPACKETSIZE;
+	char buff[RTP_MAXPACKETSIZE];
 	while (1) {
 		xmp_len = xmp(buff, buff_size);
-		write(STDOUT_FILENO, buff, xmp_len);
+		rtp_sendpacket(buff, xmp_len, PT_STATUS);
 
 		usleep(10 * 1000); //less than 100Hz
 	}
@@ -166,7 +172,10 @@ void *recieve_thread_func(void* arg) {
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
-	int file_fd = STDIN_FILENO;
+	int file_fd = open("cmd", O_WDONLY);
+	if (file_fd < 0) {
+		return NULL;
+	}
 	bool xmp = false;
 	char *buff_xmp = NULL;
 	int xmp_len = 0;
@@ -323,7 +332,24 @@ void *recieve_thread_func(void* arg) {
 	free(buff);
 }
 
+static int rtp_callback(char *data, int data_len, int pt) {
+	int fd = -1;
+	if (pt == PT_CMD) {
+		fd = lg_cmd_fd;
+	}
+	if (fd < 0) {
+		return;
+	}
+	write(fd, data, data_len);
+}
+
 int main(int argc, char *argv[]) {
+
+	lg_cmd_fd = open("cmd", O_WRONLY);
+	rtp_set_callback(rtp_callback);
+
+	init_rtp(9004, "192.168.4.2", 9002);
+	init_video();
 
 	pthread_t transmit_thread;
 	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
