@@ -26,7 +26,7 @@ pthread_t lg_cam1_thread;
 
 static void *camx_thread_func(void* arg) {
 	int cam_num = (int) arg;
-	unsigned char buff[RTP_MAXPACKETSIZE];
+	char buff[RTP_MAXPACKETSIZE];
 	int buff_size = RTP_MAXPACKETSIZE;
 	sprintf(buff, "cam%d", cam_num);
 	int camd_fd = open(buff, O_RDONLY);
@@ -37,7 +37,7 @@ static void *camx_thread_func(void* arg) {
 		int data_len = read(camd_fd, buff, buff_size);
 
 		// send the packet
-		rtp_sendpacket(buff, data_len, PT_CAM_BASE + cam_num);
+		rtp_sendpacket((unsigned char*)buff, data_len, PT_CAM_BASE + cam_num);
 	}
 	close(camd_fd);
 	return NULL;

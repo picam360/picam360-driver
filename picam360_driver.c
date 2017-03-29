@@ -24,7 +24,8 @@
 
 #define PT_STATUS 100
 #define PT_CMD 101
-int lg_cmd_fd = -1;
+int lg_cmd_rd_fd = -1;
+int lg_cmd_wr_fd = -1;
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
@@ -173,10 +174,6 @@ void *recieve_thread_func(void* arg) {
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
-	int file_fd = open("cmd", O_WRONLY);
-	if (file_fd < 0) {
-		return NULL;
-	}
 	bool xmp = false;
 	char *buff_xmp = NULL;
 	int xmp_len = 0;
@@ -336,7 +333,7 @@ void *recieve_thread_func(void* arg) {
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
 	int fd = -1;
 	if (pt == PT_CMD) {
-		fd = lg_cmd_fd;
+		fd = lg_cmd_wr_fd;
 	}
 	if (fd < 0) {
 		return -1;
@@ -347,7 +344,14 @@ static int rtp_callback(unsigned char *data, int data_len, int pt) {
 
 int main(int argc, char *argv[]) {
 
-	lg_cmd_fd = open("cmd", O_WRONLY);
+	lg_cmd_rd_fd = open("cmd", O_RDONLY);
+	if (lg_cmd_rd_fd < 0) {
+		return -1;
+	}
+	lg_cmd_wr_fd = open("cmd", O_WRONLY);
+	if (lg_cmd_wr_fd < 0) {
+		return -1;
+	}
 	rtp_set_callback((RTP_CALLBACK)rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
