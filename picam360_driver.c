@@ -55,9 +55,9 @@ bool init() {
 	if (fd > 0) {
 		char cmd[256];
 		int len;
-		len = sprintf(cmd, "%d=%f\n", lg_light0_id, 0);
+		len = sprintf(cmd, "%d=%f\n", lg_light0_id, 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light1_id, 0);
+		len = sprintf(cmd, "%d=%f\n", lg_light1_id, 0.0f);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_motor0_id, MOTOR_CENTER);
 		write(fd, cmd, len);
@@ -158,7 +158,7 @@ void *transmit_thread_func(void* arg) {
 	}
 	int xmp_len = 0;
 	int buff_size = RTP_MAXPACKETSIZE;
-	char buff[RTP_MAXPACKETSIZE];
+	unsigned char buff[RTP_MAXPACKETSIZE];
 	while (1) {
 		xmp_len = xmp(buff, buff_size);
 		rtp_sendpacket(buff, xmp_len, PT_STATUS);
@@ -172,7 +172,7 @@ void *recieve_thread_func(void* arg) {
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
 	int marker = 0;
-	int file_fd = open("cmd", O_WDONLY);
+	int file_fd = open("cmd", O_WRONLY);
 	if (file_fd < 0) {
 		return NULL;
 	}
@@ -332,13 +332,13 @@ void *recieve_thread_func(void* arg) {
 	free(buff);
 }
 
-static int rtp_callback(char *data, int data_len, int pt) {
+static int rtp_callback(unsigned char *data, int data_len, int pt) {
 	int fd = -1;
 	if (pt == PT_CMD) {
 		fd = lg_cmd_fd;
 	}
 	if (fd < 0) {
-		return;
+		return -1;
 	}
 	write(fd, data, data_len);
 }
