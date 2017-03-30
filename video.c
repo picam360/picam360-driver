@@ -26,8 +26,8 @@ pthread_t lg_cam1_thread;
 
 static void *camx_thread_func(void* arg) {
 	int cam_num = (int) arg;
-	char buff[RTP_MAXPACKETSIZE];
-	int buff_size = RTP_MAXPACKETSIZE;
+	char buff[RTP_MAXPAYLOADSIZE];
+	int buff_size = RTP_MAXPAYLOADSIZE;
 	sprintf(buff, "cam%d", cam_num);
 	int camd_fd = open(buff, O_RDONLY);
 	if (camd_fd < 0) {

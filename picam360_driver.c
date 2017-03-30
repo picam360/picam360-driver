@@ -151,8 +151,8 @@ int xmp(char *buff, int buff_len) {
 
 void *transmit_thread_func(void* arg) {
 	int xmp_len = 0;
-	int buff_size = RTP_MAXPACKETSIZE;
-	char buff[RTP_MAXPACKETSIZE];
+	int buff_size = RTP_MAXPAYLOADSIZE;
+	char buff[RTP_MAXPAYLOADSIZE];
 	while (1) {
 		xmp_len = xmp(buff, buff_size);
 		rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);

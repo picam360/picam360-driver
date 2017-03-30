@@ -35,6 +35,7 @@ static bool lg_receive_run = false;
 pthread_t lg_receive_thread;
 static RTPSession lg_sess;
 static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
+static int lg_record_fd = -1;
 
 static RTP_CALLBACK lg_callback = NULL;
 
@@ -63,7 +64,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			diff_nsec = 1;
 		}
 		status = lg_sess.SendPacket(data, data_len, pt, false, diff_nsec);
-		checkerror (status);
+		checkerror(status);
 		last_time = time;
 	}
 	pthread_mutex_unlock(&lg_mlock);
@@ -83,7 +84,12 @@ static void *receive_thread_func(void* arg) {
 				while ((pack = lg_sess.GetNextPacket()) != NULL) {
 					if (lg_callback) {
 						lg_callback(pack->GetPayloadData(),
-								pack->GetPayloadLength(), pack->GetPayloadType());
+								pack->GetPayloadLength(),
+								pack->GetPayloadType());
+					}
+					if (lg_record_fd > 0) {
+						write(lg_record_fd, pack->GetPacketData(),
+								pack->GetPacketLength());
 					}
 
 					lg_sess.DeletePacket(pack);
@@ -95,14 +101,15 @@ static void *receive_thread_func(void* arg) {
 
 #ifndef RTP_SUPPORT_THREAD
 		status = lg_sess.Poll();
-		checkerror (status);
+		checkerror(status);
 #endif // RTP_SUPPORT_THREAD
 	}
 	return NULL;
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport) {
+int init_rtp(unsigned short portbase, char *destip_str,
+		unsigned short destport) {
 	if (is_init) {
 		return -1;
 	}
@@ -126,9 +133,10 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport)
 	RTPSessionParams sessparams;
 
 	sessparams.SetOwnTimestampUnit(1.0 / 1E6);	//micro sec
-
+	sessparams.SetMaximumPacketSize(RTP_MAXPAYLOADSIZE + 32);
 	sessparams.SetAcceptOwnPackets(true);
 	transparams.SetPortbase(portbase);
+
 	status = lg_sess.Create(sessparams, &transparams);
 	checkerror(status);
 
@@ -152,4 +160,14 @@ int deinit_rtp() {
 	lg_sess.BYEDestroy(RTPTime(10, 0), 0, 0);
 	is_init = false;
 	return 0;
+}
+void rtp_start_recording(char *path) {
+	rtp_stop_recording();
+	lg_record_fd = open(path, O_CREAT | O_WRONLY | O_TRUNC);
+}
+void rtp_stop_recording() {
+	if (lg_record_fd > 0) {
+		close (lg_record_fd);
+		lg_record_fd = -1;
+	}
 }
