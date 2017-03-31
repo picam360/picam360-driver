@@ -140,6 +140,11 @@ int xmp(char *buff, int buff_len) {
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
 	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
 			rtp_get_bandwidth());
+	for (int i = 0; i < 2; i++) {
+		xmp_len += sprintf(buff + xmp_len,
+				"<video_info_%d fps=\"%f\" frameskip=\"%d\" />", i,
+				video_get_fps(), video_get_frameskip());
+	}
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");

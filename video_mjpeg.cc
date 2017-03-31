@@ -34,7 +34,9 @@ extern "C" {
 
 #define NUM_OF_CAM 2
 static bool lg_cam_run = false;
-pthread_t lg_cam_thread[NUM_OF_CAM];
+static pthread_t lg_cam_thread[NUM_OF_CAM] = { };
+static float lg_fps[NUM_OF_CAM] = { };
+static int lg_frameskip[NUM_OF_CAM] = { };
 
 #define MAX_IMAGE_SIZE (16*1024*1024) //16M
 class _PACKET_T {
@@ -99,7 +101,7 @@ static void *sendframe_thread_func(void* arg) {
 				mrevent_reset(&send_frame_arg->frame_ready);
 				break;
 			}
-			//printf("skip frame on cam%d\n", send_frame_arg->cam_num);
+			lg_frameskip[cam_num]++;
 			delete frame; //skip frame
 		}
 		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
@@ -147,6 +149,9 @@ static void *camx_thread_func(void* arg) {
 	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
 			(void*) &send_frame_arg);
 
+	static struct timeval last_time = { };
+	gettimeofday(&last_time, NULL);
+
 	int marker = 0;
 	int soicount = 0;
 	_FRAME_T *active_frame = NULL;
@@ -187,6 +192,18 @@ static void *camx_thread_func(void* arg) {
 						mrevent_trigger(&active_frame->packet_ready);
 
 						active_frame = NULL;
+						{ //fps
+							struct timeval diff;
+							timersub(&time, &last_time, &diff);
+							float diff_sec = (float) diff.tv_sec
+									+ (float) diff.tv_usec / 1000000;
+							float frame_sec =
+									(((lg_fps != 0) ? 1.0 / lg_fps : 0) * 0.9
+											+ diff_sec * 0.1);
+							lg_fps[cam_num] =
+									(frame_sec != 0) ? 1.0 / frame_sec : 0;
+							last_time = time;
+						}
 					}
 				}
 			} else if (buff[i] == 0xFF) {
@@ -234,4 +251,11 @@ void deinit_video() {
 	}
 
 	is_init = false;
+}
+
+float video_get_fps(int cam_num) {
+	return lg_fps[MAX(MIN(cam_num,NUM_OF_CAM-1), 0)];
+}
+int video_get_frameskip(int cam_num) {
+	return lg_frameskip[MAX(MIN(cam_num,NUM_OF_CAM-1), 0)];
 }
