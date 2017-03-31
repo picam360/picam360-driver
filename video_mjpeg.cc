@@ -13,6 +13,7 @@
 #include <math.h>
 #include <limits.h>
 #include <list>
+#include <sys/time.h>
 
 #include "video_mjpeg.h"
 #include "rtp.h"
@@ -101,7 +102,7 @@ static void *sendframe_thread_func(void* arg) {
 				mrevent_reset(&send_frame_arg->frame_ready);
 				break;
 			}
-			lg_frameskip[cam_num]++;
+			lg_frameskip[send_frame_arg->cam_num]++;
 			delete frame; //skip frame
 		}
 		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
@@ -198,7 +199,7 @@ static void *camx_thread_func(void* arg) {
 							float diff_sec = (float) diff.tv_sec
 									+ (float) diff.tv_usec / 1000000;
 							float frame_sec =
-									(((lg_fps != 0) ? 1.0 / lg_fps : 0) * 0.9
+									(((lg_fps[cam_num] != 0) ? 1.0 / lg_fps[cam_num] : 0) * 0.9
 											+ diff_sec * 0.1);
 							lg_fps[cam_num] =
 									(frame_sec != 0) ? 1.0 / frame_sec : 0;
