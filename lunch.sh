@@ -45,4 +45,4 @@ chmod 0666 cmd
 sleep 3
 
 # driver
-./picam360-driver.bin &
+./picam360-driver.bin
