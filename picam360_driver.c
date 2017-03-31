@@ -142,7 +142,7 @@ int xmp(char *buff, int buff_len) {
 			rtp_get_bandwidth());
 	for (int i = 0; i < 2; i++) {
 		xmp_len += sprintf(buff + xmp_len,
-				"<video_info_%d fps=\"%f\" frameskip=\"%d\" />", i,
+				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
 				video_get_fps(), video_get_frameskip());
 	}
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
