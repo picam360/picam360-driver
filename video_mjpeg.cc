@@ -202,12 +202,9 @@ static void *camx_thread_func(void* arg) {
 							float diff_sec = (float) diff.tv_sec
 									+ (float) diff.tv_usec / 1000000;
 							float tmp = 1.0f / diff_sec;
-							float frame_sec = ((
-									(lg_fps[cam_num] != 0) ?
-											1.0 / lg_fps[cam_num] : 0) * 0.9
-									+ diff_sec * 0.1);
-							lg_fps[cam_num] =
-									(frame_sec != 0) ? 1.0 / frame_sec : 0;
+							float w = diff_sec / 10;
+							lg_fps[cam_num] = lg_fps[cam_num] * (1.0 - w)
+									+ tmp * w;
 							send_frame_arg.last_time = time;
 						}
 					}
