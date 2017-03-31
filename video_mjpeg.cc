@@ -12,8 +12,8 @@
 #include <pthread.h>
 #include <math.h>
 #include <limits.h>
-#include <list>
 #include <sys/time.h>
+#include <list>
 
 #include "video_mjpeg.h"
 #include "rtp.h"
@@ -81,6 +81,7 @@ public:
 		mrevent_init(&frame_ready);
 	}
 	int cam_num;
+	struct timeval last_time;
 	std::list<_FRAME_T *> frames;
 	pthread_mutex_t frames_mlock;
 	MREVENT_T frame_ready;
@@ -150,8 +151,7 @@ static void *camx_thread_func(void* arg) {
 	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
 			(void*) &send_frame_arg);
 
-	static struct timeval last_time = { };
-	gettimeofday(&last_time, NULL);
+	gettimeofday(&send_frame_arg.last_time, NULL);
 
 	int marker = 0;
 	int soicount = 0;
@@ -194,16 +194,21 @@ static void *camx_thread_func(void* arg) {
 
 						active_frame = NULL;
 						{ //fps
+							struct timeval time = { };
+							gettimeofday(&time, NULL);
+
 							struct timeval diff;
-							timersub(&time, &last_time, &diff);
+							timersub(&time, &send_frame_arg.last_time, &diff);
 							float diff_sec = (float) diff.tv_sec
 									+ (float) diff.tv_usec / 1000000;
-							float frame_sec =
-									(((lg_fps[cam_num] != 0) ? 1.0 / lg_fps[cam_num] : 0) * 0.9
-											+ diff_sec * 0.1);
+							float tmp = 1.0f / diff_sec;
+							float frame_sec = ((
+									(lg_fps[cam_num] != 0) ?
+											1.0 / lg_fps[cam_num] : 0) * 0.9
+									+ diff_sec * 0.1);
 							lg_fps[cam_num] =
 									(frame_sec != 0) ? 1.0 / frame_sec : 0;
-							last_time = time;
+							send_frame_arg.last_time = time;
 						}
 					}
 				}
