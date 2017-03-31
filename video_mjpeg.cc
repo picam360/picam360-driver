@@ -119,8 +119,14 @@ static void *sendframe_thread_func(void* arg) {
 			// send the packet
 			rtp_sendpacket((unsigned char*) packet->data, packet->len,
 			PT_CAM_BASE + send_frame_arg->cam_num);
-			delete packet;
+			if (packet->eof) {
+				delete packet;
+				break;
+			} else {
+				delete packet;
+			}
 		}
+		delete frame;
 	}
 	return NULL;
 }
