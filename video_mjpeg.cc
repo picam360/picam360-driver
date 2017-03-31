@@ -84,7 +84,7 @@ static void *sendframe_thread_func(void* arg) {
 				mrevent_reset(&send_frame_arg->frame_ready);
 				break;
 			}
-			printf("skip frame on cam%d", send_frame_arg->cam_num);
+			printf("skip frame on cam%d\n", send_frame_arg->cam_num);
 			delete frame; //skip frame
 		}
 		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
