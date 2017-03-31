@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <limits.h>
+#include <list>
 
 #include "video_mjpeg.h"
 #include "rtp.h"
@@ -38,7 +39,7 @@ pthread_t lg_cam_thread[NUM_OF_CAM];
 #define MAX_IMAGE_SIZE (16*1024*1024) //16M
 class _PACKET_T {
 public:
-	void _PACKET_T() {
+	_PACKET_T() {
 		len = 0;
 		eof = false;
 	}
@@ -48,9 +49,23 @@ public:
 };
 class _FRAME_T {
 public:
-	void _FRAME_T() {
+	_FRAME_T() {
 		pthread_mutex_init(&packets_mlock, NULL);
 		mrevent_init(&packet_ready);
+	}
+	~_FRAME_T() {
+		_FRAME_T *frame = this;
+		while (!frame->packets.empty()) {
+			_PACKET_T *packet;
+			pthread_mutex_lock(&frame->packets_mlock);
+			packet = *(frame->packets.begin());
+			frame->packets.pop_front();
+			if (frame->packets.empty()) {
+				mrevent_reset(&frame->packet_ready);
+			}
+			pthread_mutex_unlock(&frame->packets_mlock);
+			delete packet;
+		}
 	}
 	std::list<_PACKET_T *> packets;
 	pthread_mutex_t packets_mlock;
@@ -58,7 +73,7 @@ public:
 };
 class _SENDFRAME_ARG_T {
 public:
-	void _SENDFRAME_ARG_T() {
+	_SENDFRAME_ARG_T() {
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
 	}
@@ -95,7 +110,7 @@ static void *sendframe_thread_func(void* arg) {
 			}
 			_PACKET_T *packet;
 			pthread_mutex_lock(&frame->packets_mlock);
-			frame = *(frame->packets.begin());
+			packet = *(frame->packets.begin());
 			frame->packets.pop_front();
 			if (frame->packets.empty()) {
 				mrevent_reset(&frame->packet_ready);
@@ -126,6 +141,8 @@ static void *camx_thread_func(void* arg) {
 	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
 			(void*) &send_frame_arg);
 
+	int marker = 0;
+	int soicount = 0;
 	_FRAME_T *active_frame = NULL;
 	while (lg_cam_run) {
 		int soi_pos = INT_MIN;
@@ -137,7 +154,7 @@ static void *camx_thread_func(void* arg) {
 				if (buff[i] == 0xD8) { //SOI
 					if (soicount == 0) {
 						soi_pos = (i - 1);
-						active_frame = new _FRAME;
+						active_frame = new _FRAME_T;
 
 						pthread_mutex_lock(&send_frame_arg.frames_mlock);
 						send_frame_arg.frames.push_back(active_frame);
@@ -149,7 +166,7 @@ static void *camx_thread_func(void* arg) {
 				if (buff[i] == 0xD9 && active_frame != NULL) { //EOI
 					soicount--;
 					if (soicount == 0) {
-						_PACKET_T *packet = new _PACKET;
+						_PACKET_T *packet = new _PACKET_T;
 						packet->eof = true;
 						if (soi_pos >= 0) { //soi
 							packet->len = (i + 1) - soi_pos;
@@ -171,7 +188,7 @@ static void *camx_thread_func(void* arg) {
 			}
 		}
 		if (active_frame != NULL) {
-			_PACKET_T *packet = new _PACKET;
+			_PACKET_T *packet = new _PACKET_T;
 			if (soi_pos >= 0) { //soi
 				packet->len = data_len - soi_pos;
 				memcpy(packet->data, buff + soi_pos, packet->len);
