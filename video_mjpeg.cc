@@ -77,11 +77,13 @@ public:
 class _SENDFRAME_ARG_T {
 public:
 	_SENDFRAME_ARG_T() {
+		cam_num = 0;
+		framecount = 0;
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
 	}
 	int cam_num;
-	struct timeval last_time;
+	int framecount;
 	std::list<_FRAME_T *> frames;
 	pthread_mutex_t frames_mlock;
 	MREVENT_T frame_ready;
@@ -89,8 +91,11 @@ public:
 
 static void *sendframe_thread_func(void* arg) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
+	int last_framecount = send_frame_arg->framecount;
+	struct timeval last_time = { };
+	gettimeofday(&last_time, NULL);
 	while (lg_cam_run) {
-		int res = mrevent_wait(&send_frame_arg->frame_ready, 1000);
+		int res = mrevent_wait(&send_frame_arg->frame_ready, 100 * 1000);
 		if (res != 0) {
 			continue;
 		}
@@ -99,6 +104,7 @@ static void *sendframe_thread_func(void* arg) {
 		while (1) {
 			frame = *(send_frame_arg->frames.begin());
 			send_frame_arg->frames.pop_front();
+			send_frame_arg->framecount++;
 			if (send_frame_arg->frames.empty()) {
 				mrevent_reset(&send_frame_arg->frame_ready);
 				break;
@@ -108,7 +114,27 @@ static void *sendframe_thread_func(void* arg) {
 		}
 		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
 		while (lg_cam_run) {
-			int res = mrevent_wait(&frame->packet_ready, 1000);
+			{ //fps
+				struct timeval time = { };
+				gettimeofday(&time, NULL);
+
+				struct timeval diff;
+				timersub(&time, &last_time, &diff);
+				float diff_sec = (float) diff.tv_sec
+						+ (float) diff.tv_usec / 1000000;
+				if (diff_sec > 1.0) {
+					float tmp = (float) (send_frame_arg->framecount
+							- last_framecount) / diff_sec;
+					float w = diff_sec / 10;
+					lg_fps[send_frame_arg->cam_num] =
+							lg_fps[send_frame_arg->cam_num] * (1.0 - w)
+									+ tmp * w;
+
+					last_framecount = send_frame_arg->framecount;
+					last_time = time;
+				}
+			}
+			int res = mrevent_wait(&frame->packet_ready, 100 * 1000);
 			if (res != 0) {
 				continue;
 			}
@@ -151,8 +177,6 @@ static void *camx_thread_func(void* arg) {
 	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
 			(void*) &send_frame_arg);
 
-	gettimeofday(&send_frame_arg.last_time, NULL);
-
 	int marker = 0;
 	int soicount = 0;
 	_FRAME_T *active_frame = NULL;
@@ -193,20 +217,6 @@ static void *camx_thread_func(void* arg) {
 						mrevent_trigger(&active_frame->packet_ready);
 
 						active_frame = NULL;
-						{ //fps
-							struct timeval time = { };
-							gettimeofday(&time, NULL);
-
-							struct timeval diff;
-							timersub(&time, &send_frame_arg.last_time, &diff);
-							float diff_sec = (float) diff.tv_sec
-									+ (float) diff.tv_usec / 1000000;
-							float tmp = 1.0f / diff_sec;
-							float w = diff_sec / 10;
-							lg_fps[cam_num] = lg_fps[cam_num] * (1.0 - w)
-									+ tmp * w;
-							send_frame_arg.last_time = time;
-						}
 					}
 				}
 			} else if (buff[i] == 0xFF) {
