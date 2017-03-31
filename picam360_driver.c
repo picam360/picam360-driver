@@ -138,6 +138,8 @@ int xmp(char *buff, int buff_len) {
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
 			lg_compass[0], lg_compass[1], lg_compass[2]);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
+	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
+			rtp_get_bandwidth());
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
