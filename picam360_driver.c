@@ -168,7 +168,7 @@ void *transmit_thread_func(void* arg) {
 	}
 }
 
-void parse_cmd(char *xml) {
+static void parse_xml(char *xml) {
 	int fd = open("/dev/pi-blaster", O_WRONLY);
 	if (fd < 0) {
 		return;
@@ -303,7 +303,8 @@ void *recieve_thread_func(void* arg) {
 					xmp_len += ((unsigned char*) buff)[i];
 					if (xmp_len > buff_xmp_size) {
 						free(buff_xmp);
-						buff_xmp = malloc(xmp_len);
+						buff_xmp_size = xmp_len;
+						buff_xmp = malloc(buff_xmp_size);
 					}
 					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
 					buff_xmp[1] = (xmp_len) & 0xFF;
@@ -314,7 +315,7 @@ void *recieve_thread_func(void* arg) {
 				if (xmp_idx >= xmp_len) {
 					char *xml = buff_xmp + strlen(buff_xmp) + 1;
 
-					parse_cmd(xml);
+					parse_xml(xml);
 					xmp = false;
 				}
 			}
@@ -330,8 +331,11 @@ void *recieve_thread_func(void* arg) {
 			}
 		}
 	}
+
 	free(buff);
 	free(buff_xmp);
+
+	return NULL;
 }
 
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
