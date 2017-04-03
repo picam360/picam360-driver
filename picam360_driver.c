@@ -143,7 +143,7 @@ int xmp(char *buff, int buff_len) {
 	for (int i = 0; i < 2; i++) {
 		xmp_len += sprintf(buff + xmp_len,
 				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
-				video_get_fps(i), video_get_frameskip(i));
+				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
 	}
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
@@ -359,7 +359,8 @@ int main(int argc, char *argv[]) {
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
-	init_video();
+	init_video(0);
+	init_video(1);
 
 	succeeded = init_pwm();
 	if (!succeeded) {

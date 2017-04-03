@@ -34,7 +34,8 @@ extern "C" {
 #define PT_CAM_BASE 110
 
 #define NUM_OF_CAM 2
-static bool lg_cam_run = false;
+static bool is_init[NUM_OF_CAM] = { };
+static bool lg_cam_run[NUM_OF_CAM] = { };
 static pthread_t lg_cam_thread[NUM_OF_CAM] = { };
 static float lg_fps[NUM_OF_CAM] = { };
 static int lg_frameskip[NUM_OF_CAM] = { };
@@ -94,7 +95,7 @@ static void *sendframe_thread_func(void* arg) {
 	int last_framecount = send_frame_arg->framecount;
 	struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
-	while (lg_cam_run) {
+	while (lg_cam_run[send_frame_arg->cam_num]) {
 		int res = mrevent_wait(&send_frame_arg->frame_ready, 100 * 1000);
 		if (res != 0) {
 			continue;
@@ -113,7 +114,7 @@ static void *sendframe_thread_func(void* arg) {
 			delete frame; //skip frame
 		}
 		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
-		while (lg_cam_run) {
+		while (lg_cam_run[send_frame_arg->cam_num]) {
 			{ //fps
 				struct timeval time = { };
 				gettimeofday(&time, NULL);
@@ -186,7 +187,7 @@ static void *camx_thread_func(void* arg) {
 	int marker = 0;
 	int soicount = 0;
 	_FRAME_T *active_frame = NULL;
-	while (lg_cam_run) {
+	while (lg_cam_run[send_frame_arg->cam_num]) {
 		int soi_pos = INT_MIN;
 		int data_len = read(camd_fd, buff, buff_size);
 
@@ -267,34 +268,30 @@ static void *camx_thread_func(void* arg) {
 	close(camd_fd);
 	return NULL;
 }
-static bool is_init = false;
-void init_video() {
-	if (is_init) {
+void init_video_mjpeg(int cam_num) {
+	if (is_init[cam_num]) {
 		return;
 	}
-	is_init = true;
+	is_init[cam_num] = true;
 
-	lg_cam_run = true;
-	for (int i = 0; i < NUM_OF_CAM; i++) {
-		pthread_create(&lg_cam_thread[i], NULL, camx_thread_func, (void*) i);
-	}
+	lg_cam_run[cam_num] = true;
+	pthread_create(&lg_cam_thread[cam_num], NULL, camx_thread_func,
+			(void*) cam_num);
 }
-void deinit_video() {
-	if (!is_init) {
+void deinit_video_mjpeg(int cam_num) {
+	if (!is_init[cam_num]) {
 		return;
 	}
 
-	lg_cam_run = false;
-	for (int i = 0; i < NUM_OF_CAM; i++) {
-		pthread_join(lg_cam_thread[i], NULL);
-	}
+	lg_cam_run[cam_num] = false;
+	pthread_join(lg_cam_thread[cam_num], NULL);
 
-	is_init = false;
+	is_init[cam_num] = false;
 }
 
-float video_get_fps(int cam_num) {
+float video_mjpeg_get_fps(int cam_num) {
 	return lg_fps[MAX(MIN(cam_num,NUM_OF_CAM-1), 0)];
 }
-int video_get_frameskip(int cam_num) {
+int video_mjpeg_get_frameskip(int cam_num) {
 	return lg_frameskip[MAX(MIN(cam_num,NUM_OF_CAM-1), 0)];
 }

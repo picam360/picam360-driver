@@ -4,10 +4,10 @@
 extern "C" {
 #endif
 
-void init_video();
-void deinit_video();
-float video_get_fps(int cam_num);
-int video_get_frameskip(int cam_num);
+void init_video_mjpeg(int cam_num);
+void deinit_video_mjpeg(int cam_num);
+float video_mjpeg_get_fps(int cam_num);
+int video_mjpeg_get_frameskip(int cam_num);
 
 #ifdef __cplusplus
 }
