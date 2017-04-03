@@ -138,14 +138,20 @@ static void *sendframe_thread_func(void* arg) {
 			if (res != 0) {
 				continue;
 			}
-			_PACKET_T *packet;
+			_PACKET_T *packet = NULL;
 			pthread_mutex_lock(&frame->packets_mlock);
-			packet = *(frame->packets.begin());
-			frame->packets.pop_front();
+			if (!frame->packets.empty()) {
+				packet = *(frame->packets.begin());
+				frame->packets.pop_front();
+			}
 			if (frame->packets.empty()) {
 				mrevent_reset(&frame->packet_ready);
 			}
 			pthread_mutex_unlock(&frame->packets_mlock);
+			if (packet == NULL) {
+				fprintf(stderr, "packet is null\n");
+				continue;
+			}
 			// send the packet
 			rtp_sendpacket((unsigned char*) packet->data, packet->len,
 			PT_CAM_BASE + send_frame_arg->cam_num);
@@ -223,8 +229,8 @@ static void *camx_thread_func(void* arg) {
 						}
 						pthread_mutex_lock(&active_frame->packets_mlock);
 						active_frame->packets.push_back(packet);
-						pthread_mutex_unlock(&active_frame->packets_mlock);
 						mrevent_trigger(&active_frame->packet_ready);
+						pthread_mutex_unlock(&active_frame->packets_mlock);
 
 						active_frame = NULL;
 					}
