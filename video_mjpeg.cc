@@ -206,15 +206,17 @@ static void *camx_thread_func(void* arg) {
 						packet->eof = true;
 						if (soi_pos >= 0) { //soi
 							packet->len = (i + 1) - soi_pos;
-							if(packet->len >= RTP_MAXPAYLOADSIZE){
-								perror("packet length exceeded. %d\n", packet->len);
+							if (packet->len >= RTP_MAXPAYLOADSIZE) {
+								fprintf(stderr, "packet length exceeded. %d\n",
+										packet->len);
 								packet->len = RTP_MAXPAYLOADSIZE;
 							}
 							memcpy(packet->data, buff + soi_pos, packet->len);
 						} else {
 							packet->len = i + 1;
-							if(packet->len >= RTP_MAXPAYLOADSIZE){
-								perror("packet length exceeded. %d\n", packet->len);
+							if (packet->len >= RTP_MAXPAYLOADSIZE) {
+								fprintf(stderr, "packet length exceeded. %d\n",
+										packet->len);
 								packet->len = RTP_MAXPAYLOADSIZE;
 							}
 							memcpy(packet->data, buff, packet->len);
@@ -235,15 +237,17 @@ static void *camx_thread_func(void* arg) {
 			_PACKET_T *packet = new _PACKET_T;
 			if (soi_pos >= 0) { //soi
 				packet->len = data_len - soi_pos;
-				if(packet->len >= RTP_MAXPAYLOADSIZE){
-					perror("packet length exceeded. %d\n", packet->len);
+				if (packet->len >= RTP_MAXPAYLOADSIZE) {
+					fprintf(stderr, "packet length exceeded. %d\n",
+							packet->len);
 					packet->len = RTP_MAXPAYLOADSIZE;
 				}
 				memcpy(packet->data, buff + soi_pos, packet->len);
 			} else {
 				packet->len = data_len;
-				if(packet->len >= RTP_MAXPAYLOADSIZE){
-					perror("packet length exceeded. %d\n", packet->len);
+				if (packet->len >= RTP_MAXPAYLOADSIZE) {
+					fprintf(stderr, "packet length exceeded. %d\n",
+							packet->len);
 					packet->len = RTP_MAXPAYLOADSIZE;
 				}
 				memcpy(packet->data, buff, packet->len);
