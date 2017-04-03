@@ -168,6 +168,110 @@ void *transmit_thread_func(void* arg) {
 	}
 }
 
+void parse_cmd(char *xml) {
+	char *value_str;
+
+	value_str = strstr(xml, "light0_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "light0_value=\"%f\"", &value);
+		value = MIN(MAX(value, 0), 100);
+		if (value != lg_light_value[0]) {
+			lg_light_value[0] = value;
+
+			value = pow(value / 100, 3);
+			len = sprintf(cmd, "%d=%f\n", lg_light0_id, value);
+			write(fd, cmd, len);
+		}
+	}
+
+	value_str = strstr(xml, "light1_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "light1_value=\"%f\"", &value);
+		value = MIN(MAX(value, 0), 100);
+		if (value != lg_light_value[1]) {
+			lg_light_value[1] = value;
+
+			value = pow(value / 100, 3);
+			len = sprintf(cmd, "%d=%f\n", lg_light1_id, value);
+			write(fd, cmd, len);
+		}
+	}
+
+	value_str = strstr(xml, "motor0_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "motor0_value=\"%f\"", &value);
+		value = MIN(MAX(value, -100), 100);
+		if (value != lg_motor_value[0]) {
+			lg_motor_value[0] = value;
+
+			value = lg_dir[0] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_dir[0] * value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor0_id, value);
+			write(fd, cmd, len);
+		}
+	}
+
+	value_str = strstr(xml, "motor1_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "motor1_value=\"%f\"", &value);
+		value = MIN(MAX(value, -100), 100);
+		if (value != lg_motor_value[1]) {
+			lg_motor_value[1] = value;
+
+			value = lg_dir[1] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_dir[1] * value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor1_id, value);
+			write(fd, cmd, len);
+		}
+	}
+
+	value_str = strstr(xml, "motor2_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "motor2_value=\"%f\"", &value);
+		value = MIN(MAX(value, -100), 100);
+		if (value != lg_motor_value[2]) {
+			lg_motor_value[2] = value;
+
+			value = lg_dir[2] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_dir[2] * value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor2_id, value);
+			write(fd, cmd, len);
+		}
+	}
+
+	value_str = strstr(xml, "motor3_value=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "motor3_value=\"%f\"", &value);
+		value = MIN(MAX(value, -100), 100);
+		if (value != lg_motor_value[3]) {
+			lg_motor_value[3] = value;
+
+			value = lg_dir[3] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_dir[3] * value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor3_id, value);
+			write(fd, cmd, len);
+		}
+	}
+}
+
 void *recieve_thread_func(void* arg) {
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
@@ -178,7 +282,8 @@ void *recieve_thread_func(void* arg) {
 		return NULL;
 	}
 	bool xmp = false;
-	char *buff_xmp = NULL;
+	int buff_xmp_size = 4096
+	char *buff_xmp = malloc(buff_xmp_size);
 	int xmp_len = 0;
 	int xmp_idx = 0;
 
@@ -190,7 +295,10 @@ void *recieve_thread_func(void* arg) {
 					xmp_len = ((unsigned char*) buff)[i] << 8;
 				} else if (xmp_idx == 1) {
 					xmp_len += ((unsigned char*) buff)[i];
-					buff_xmp = malloc(xmp_len);
+					if (xmp_len > buff_xmp_size) {
+						free(buff_xmp);
+						buff_xmp = malloc(xmp_len);
+					}
 					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
 					buff_xmp[1] = (xmp_len) & 0xFF;
 				} else {
@@ -202,117 +310,8 @@ void *recieve_thread_func(void* arg) {
 					if (fd > 0) {
 						char *xml = buff_xmp + strlen(buff_xmp) + 1;
 
-						char *value_str;
-
-						value_str = strstr(xml, "light0_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "light0_value=\"%f\"", &value);
-							value = MIN(MAX(value, 0), 100);
-							if (value != lg_light_value[0]) {
-								lg_light_value[0] = value;
-
-								value = pow(value / 100, 3);
-								len = sprintf(cmd, "%d=%f\n", lg_light0_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
-						value_str = strstr(xml, "light1_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "light1_value=\"%f\"", &value);
-							value = MIN(MAX(value, 0), 100);
-							if (value != lg_light_value[1]) {
-								lg_light_value[1] = value;
-
-								value = pow(value / 100, 3);
-								len = sprintf(cmd, "%d=%f\n", lg_light1_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
-						value_str = strstr(xml, "motor0_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "motor0_value=\"%f\"", &value);
-							value = MIN(MAX(value, -100), 100);
-							if (value != lg_motor_value[0]) {
-								lg_motor_value[0] = value;
-
-								value = lg_dir[0] * (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(lg_dir[0] * value);
-								len = sprintf(cmd, "%d=%f\n", lg_motor0_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
-						value_str = strstr(xml, "motor1_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "motor1_value=\"%f\"", &value);
-							value = MIN(MAX(value, -100), 100);
-							if (value != lg_motor_value[1]) {
-								lg_motor_value[1] = value;
-
-								value = lg_dir[1] * (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(lg_dir[1] * value);
-								len = sprintf(cmd, "%d=%f\n", lg_motor1_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
-						value_str = strstr(xml, "motor2_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "motor2_value=\"%f\"", &value);
-							value = MIN(MAX(value, -100), 100);
-							if (value != lg_motor_value[2]) {
-								lg_motor_value[2] = value;
-
-								value = lg_dir[2] * (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(lg_dir[2] * value);
-								len = sprintf(cmd, "%d=%f\n", lg_motor2_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
-						value_str = strstr(xml, "motor3_value=");
-						if (value_str) {
-							char cmd[256];
-							float value;
-							int len;
-							sscanf(value_str, "motor3_value=\"%f\"", &value);
-							value = MIN(MAX(value, -100), 100);
-							if (value != lg_motor_value[3]) {
-								lg_motor_value[3] = value;
-
-								value = lg_dir[3] * (value / 100) * MOTOR_RANGE
-										+ MOTOR_BASE(lg_dir[3] * value);
-								len = sprintf(cmd, "%d=%f\n", lg_motor3_id,
-										value);
-								write(fd, cmd, len);
-							}
-						}
-
+						parse_cmd(xml);
 						xmp = false;
-						free(buff_xmp);
-						buff_xmp = NULL;
 
 						close(fd);
 					}
@@ -331,6 +330,7 @@ void *recieve_thread_func(void* arg) {
 		}
 	}
 	free(buff);
+	free(buff_xmp);
 }
 
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
