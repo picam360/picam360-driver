@@ -169,6 +169,10 @@ void *transmit_thread_func(void* arg) {
 }
 
 void parse_cmd(char *xml) {
+	int fd = open("/dev/pi-blaster", O_WRONLY);
+	if (fd < 0) {
+		return;
+	}
 	char *value_str;
 
 	value_str = strstr(xml, "light0_value=");
@@ -270,6 +274,8 @@ void parse_cmd(char *xml) {
 			write(fd, cmd, len);
 		}
 	}
+
+	close(fd);
 }
 
 void *recieve_thread_func(void* arg) {
@@ -282,7 +288,7 @@ void *recieve_thread_func(void* arg) {
 		return NULL;
 	}
 	bool xmp = false;
-	int buff_xmp_size = 4096
+	int buff_xmp_size = 4096;
 	char *buff_xmp = malloc(buff_xmp_size);
 	int xmp_len = 0;
 	int xmp_idx = 0;
@@ -306,15 +312,10 @@ void *recieve_thread_func(void* arg) {
 				}
 				xmp_idx++;
 				if (xmp_idx >= xmp_len) {
-					int fd = open("/dev/pi-blaster", O_WRONLY);
-					if (fd > 0) {
-						char *xml = buff_xmp + strlen(buff_xmp) + 1;
+					char *xml = buff_xmp + strlen(buff_xmp) + 1;
 
-						parse_cmd(xml);
-						xmp = false;
-
-						close(fd);
-					}
+					parse_cmd(xml);
+					xmp = false;
 				}
 			}
 			if (marker) {
