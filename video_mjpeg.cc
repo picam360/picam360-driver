@@ -90,6 +90,7 @@ public:
 	pthread_mutex_t frames_mlock;
 	MREVENT_T frame_ready;
 	pthread_t cam_thread;
+	void *user_data;
 };
 
 _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
@@ -270,15 +271,16 @@ static void *camx_thread_func(void* arg) {
 	close(camd_fd);
 	return NULL;
 }
-void init_video_mjpeg(int cam_num) {
+void init_video_mjpeg(int cam_num, void *user_data) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
 	lg_send_frame_arg[cam_num] = new _SENDFRAME_ARG_T;
 	lg_send_frame_arg[cam_num]->cam_num = cam_num;
-	lg_send_frame_arg[cam_num]->cam_run = true;
+	lg_send_frame_arg[cam_num]->user_data = user_data;
 
+	lg_send_frame_arg[cam_num]->cam_run = true;
 	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
 			camx_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
