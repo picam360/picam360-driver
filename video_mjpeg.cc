@@ -35,7 +35,6 @@ extern "C" {
 
 #define NUM_OF_CAM 2
 
-#define MAX_IMAGE_SIZE (16*1024*1024) //16M
 class _PACKET_T {
 public:
 	_PACKET_T() {
