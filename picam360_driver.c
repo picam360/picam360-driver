@@ -170,12 +170,13 @@ void *transmit_thread_func(void* arg) {
 	while (1) {
 		count++;
 		{
-			int cur = (++lg_delay_cur) % MAX_DELAY_COUNT;
+			int cur = (lg_delay_cur + 1) % MAX_DELAY_COUNT;
 			ms_update();
 			lg_quatanion_queue[cur][0] = quatanion[0];
 			lg_quatanion_queue[cur][1] = quatanion[1];
 			lg_quatanion_queue[cur][2] = quatanion[2];
 			lg_quatanion_queue[cur][3] = quatanion[3];
+			lg_delay_cur++;
 		}
 		if ((count % 100) == 0) {
 			xmp_len = xmp(buff, buff_size);
@@ -379,6 +380,8 @@ int main(int argc, char *argv[]) {
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
+
+	set_video_mjpeg_xmp_callback(xmp);
 	init_video_mjpeg(0, NULL);
 	init_video_mjpeg(1, NULL);
 
