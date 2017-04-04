@@ -339,6 +339,9 @@ void *recieve_thread_func(void* arg) {
 }
 
 static int rtp_callback(unsigned char *data, int data_len, int pt) {
+	if (data_len <= 0) {
+		return -1;
+	}
 	int fd = -1;
 	if (pt == PT_CMD) {
 		if (lg_cmd_fd < 0) {
@@ -359,8 +362,8 @@ int main(int argc, char *argv[]) {
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
-	init_video_mjpeg(0);
-	init_video_mjpeg(1);
+	init_video_mjpeg(0, NULL);
+	init_video_mjpeg(1, NULL);
 
 	succeeded = init_pwm();
 	if (!succeeded) {
