@@ -50,8 +50,8 @@ static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_dir[4] = { -1, 1, -1, 1 };
 
 #define MAX_DELAY_COUNT 256
-static int lg_delay = 0;
-static int lg_delay_cur = 0;
+static float lg_video_delay = 0;
+static int lg_video_delay_cur = 0;
 static float lg_quatanion_queue[MAX_DELAY_COUNT][4] = { };
 
 bool init_pwm() {
@@ -82,12 +82,12 @@ int xmp(char *buff, int buff_len) {
 
 	float quat[4];
 	{
-		int delay_cur = (lg_delay_cur - lg_delay + MAX_DELAY_COUNT)
+		int cur = (lg_video_delay_cur - (int) lg_video_delay + MAX_DELAY_COUNT)
 				% MAX_DELAY_COUNT;
-		quat[0] = lg_quatanion_queue[delay_cur][0];
-		quat[1] = lg_quatanion_queue[delay_cur][1];
-		quat[2] = lg_quatanion_queue[delay_cur][2];
-		quat[3] = lg_quatanion_queue[delay_cur][3];
+		quat[0] = lg_quatanion_queue[cur][0];
+		quat[1] = lg_quatanion_queue[cur][1];
+		quat[2] = lg_quatanion_queue[cur][2];
+		quat[3] = lg_quatanion_queue[cur][3];
 	}
 
 	{ //compas : calibration
@@ -170,13 +170,13 @@ void *transmit_thread_func(void* arg) {
 	while (1) {
 		count++;
 		{
-			int cur = (lg_delay_cur + 1) % MAX_DELAY_COUNT;
+			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
 			ms_update();
 			lg_quatanion_queue[cur][0] = quatanion[0];
 			lg_quatanion_queue[cur][1] = quatanion[1];
 			lg_quatanion_queue[cur][2] = quatanion[2];
 			lg_quatanion_queue[cur][3] = quatanion[3];
-			lg_delay_cur++;
+			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
 			xmp_len = xmp(buff, buff_size);
@@ -291,6 +291,16 @@ static void parse_xml(char *xml) {
 			len = sprintf(cmd, "%d=%f\n", lg_motor3_id, value);
 			write(fd, cmd, len);
 		}
+	}
+
+	value_str = strstr(xml, "video_delay=");
+	if (value_str) {
+		char cmd[256];
+		float value;
+		int len;
+		sscanf(value_str, "video_delay=\"%f\"", &value);
+		value = MIN(MAX(value, 0), 100);
+		lg_video_delay = value;
 	}
 
 	close(fd);
