@@ -97,7 +97,7 @@ static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
 static VIDEO_MJPEG_XMP_CALLBACK lg_video_mjpeg_xmp_callback = NULL;
 
 void set_video_mjpeg_xmp_callback(VIDEO_MJPEG_XMP_CALLBACK callback) {
-	set_video_mjpeg_xmp_callback = callback;
+	lg_video_mjpeg_xmp_callback = callback;
 }
 
 static void *sendframe_thread_func(void* arg) {

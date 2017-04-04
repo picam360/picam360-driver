@@ -36,7 +36,6 @@ static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
 static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static float lg_compass[4] = { };
-static float lg_quat[4];
 static int lg_light0_id = 4;
 static int lg_light1_id = 34;
 static int lg_motor0_id = 18;
@@ -81,13 +80,14 @@ bool init_pwm() {
 int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
+	float quat[4];
 	{
 		int delay_cur = (lg_delay_cur - lg_delay + MAX_DELAY_COUNT)
 				% MAX_DELAY_COUNT;
-		lg_quat[0] = lg_quatanion_queue[delay_cur][0];
-		lg_quat[1] = lg_quatanion_queue[delay_cur][1];
-		lg_quat[2] = lg_quatanion_queue[delay_cur][2];
-		lg_quat[3] = lg_quatanion_queue[delay_cur][3];
+		quat[0] = lg_quatanion_queue[delay_cur][0];
+		quat[1] = lg_quatanion_queue[delay_cur][1];
+		quat[2] = lg_quatanion_queue[delay_cur][2];
+		quat[3] = lg_quatanion_queue[delay_cur][3];
 	}
 
 	{ //compas : calibration
@@ -139,8 +139,8 @@ int xmp(char *buff, int buff_len) {
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", lg_quat[0],
-			lg_quat[1], lg_quat[2], lg_quat[3]);
+			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
+			quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
 			lg_compass[0], lg_compass[1], lg_compass[2]);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
@@ -170,13 +170,12 @@ void *transmit_thread_func(void* arg) {
 	while (1) {
 		count++;
 		{
-			int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
+			int cur = (++lg_delay_cur) % MAX_DELAY_COUNT;
 			ms_update();
 			lg_quatanion_queue[cur][0] = quatanion[0];
 			lg_quatanion_queue[cur][1] = quatanion[1];
 			lg_quatanion_queue[cur][2] = quatanion[2];
 			lg_quatanion_queue[cur][3] = quatanion[3];
-			lg_delay_cur++;
 		}
 		if ((count % 100) == 0) {
 			xmp_len = xmp(buff, buff_size);
