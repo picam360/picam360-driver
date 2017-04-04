@@ -271,7 +271,7 @@ static void *camx_thread_func(void* arg) {
 	return NULL;
 }
 void init_video_mjpeg(int cam_num, void *user_data) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -284,7 +284,7 @@ void init_video_mjpeg(int cam_num, void *user_data) {
 			camx_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
 void deinit_video_mjpeg(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -297,14 +297,14 @@ void deinit_video_mjpeg(int cam_num) {
 }
 
 float video_mjpeg_get_fps(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
 int video_mjpeg_get_frameskip(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1));
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}

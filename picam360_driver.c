@@ -359,8 +359,8 @@ int main(int argc, char *argv[]) {
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
 	init_rtp(9004, "192.168.4.2", 9002);
-	init_video(0);
-	init_video(1);
+	init_video_mjpeg(0);
+	init_video_mjpeg(1);
 
 	succeeded = init_pwm();
 	if (!succeeded) {
