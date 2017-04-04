@@ -50,6 +50,11 @@ static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_dir[4] = { -1, 1, -1, 1 };
 
+#define MAX_DELAY_COUNT 256
+static int lg_delay = 0;
+static int lg_delay_cur = 0;
+static float lg_quatanion_queue[MAX_DELAY_COUNT][4] = { };
+
 bool init_pwm() {
 	ms_open();
 	int fd = open("/dev/pi-blaster", O_WRONLY);
@@ -76,12 +81,13 @@ bool init_pwm() {
 int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
-	ms_update();
 	{
-		lg_quat[0] = quatanion[0];
-		lg_quat[1] = quatanion[1];
-		lg_quat[2] = quatanion[2];
-		lg_quat[3] = quatanion[3];
+		int delay_cur = (lg_delay_cur - lg_delay + MAX_DELAY_COUNT)
+				% MAX_DELAY_COUNT;
+		lg_quat[0] = lg_quatanion_queue[delay_cur][0];
+		lg_quat[1] = lg_quatanion_queue[delay_cur][1];
+		lg_quat[2] = lg_quatanion_queue[delay_cur][2];
+		lg_quat[3] = lg_quatanion_queue[delay_cur][3];
 	}
 
 	{ //compas : calibration
@@ -157,13 +163,25 @@ int xmp(char *buff, int buff_len) {
 }
 
 void *transmit_thread_func(void* arg) {
+	int count = 0;
 	int xmp_len = 0;
 	int buff_size = RTP_MAXPAYLOADSIZE;
 	char buff[RTP_MAXPAYLOADSIZE];
 	while (1) {
-		xmp_len = xmp(buff, buff_size);
-		rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
-
+		count++;
+		{
+			int cur = (lg_delay_cur) % MAX_DELAY_COUNT;
+			ms_update();
+			lg_quatanion_queue[cur][0] = quatanion[0];
+			lg_quatanion_queue[cur][1] = quatanion[1];
+			lg_quatanion_queue[cur][2] = quatanion[2];
+			lg_quatanion_queue[cur][3] = quatanion[3];
+			lg_delay_cur++;
+		}
+		if ((count % 100) == 0) {
+			xmp_len = xmp(buff, buff_size);
+			rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
+		}
 		usleep(10 * 1000); //less than 100Hz
 	}
 }

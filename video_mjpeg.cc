@@ -92,7 +92,13 @@ public:
 	void *user_data;
 };
 
-_SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
+static _SENDFRAME_ARG_T *lg_send_frame_arg[NUM_OF_CAM] = { };
+
+static VIDEO_MJPEG_XMP_CALLBACK lg_video_mjpeg_xmp_callback = NULL;
+
+void set_video_mjpeg_xmp_callback(VIDEO_MJPEG_XMP_CALLBACK callback) {
+	set_video_mjpeg_xmp_callback = callback;
+}
 
 static void *sendframe_thread_func(void* arg) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
@@ -131,9 +137,8 @@ static void *sendframe_thread_func(void* arg) {
 					float tmp = (float) (send_frame_arg->framecount
 							- last_framecount) / diff_sec;
 					float w = diff_sec / 10;
-					send_frame_arg->fps =
-							send_frame_arg->fps * (1.0 - w)
-									+ tmp * w;
+					send_frame_arg->fps = send_frame_arg->fps * (1.0 - w)
+							+ tmp * w;
 
 					last_framecount = send_frame_arg->framecount;
 					last_time = time;
@@ -245,13 +250,44 @@ static void *camx_thread_func(void* arg) {
 		if (active_frame != NULL) {
 			_PACKET_T *packet = new _PACKET_T;
 			if (soi_pos >= 0) { //soi
-				packet->len = data_len - soi_pos;
-				if (packet->len > RTP_MAXPAYLOADSIZE) {
-					fprintf(stderr, "packet length exceeded. %d\n",
-							packet->len);
-					packet->len = RTP_MAXPAYLOADSIZE;
+				if (lg_video_mjpeg_xmp_callback) { //xmp injection
+					packet->len = data_len - soi_pos;
+					packet->data[0] = 0xFF;
+					packet->data[1] = 0xD8; //soi marker
+					int xmp_len = lg_video_mjpeg_xmp_callback(packet->data + 2,
+					RTP_MAXPAYLOADSIZE - 2);
+					if (packet->len + xmp_len > RTP_MAXPAYLOADSIZE) { // split packet
+						packet->len = 2 + xmp_len;
+
+						pthread_mutex_lock(&active_frame->packets_mlock);
+						active_frame->packets.push_back(packet);
+						pthread_mutex_unlock(&active_frame->packets_mlock);
+						mrevent_trigger(&active_frame->packet_ready);
+
+						soi_pos += 2; //increment soi marker
+						if (data_len - soi_pos > 0) {
+							packet = new _PACKET_T;
+							packet->len = data_len - soi_pos;
+
+							memcpy(packet->data, buff + soi_pos, packet->len);
+						} else {
+							packet = NULL;
+						}
+					} else {
+						soi_pos += 2; //increment soi marker
+						memcpy(packet->data + 2 + xmp_len, buff + soi_pos,
+								packet->len - 2);
+						packet->len += xmp_len;
+					}
+				} else {
+					packet->len = data_len - soi_pos;
+					if (packet->len > RTP_MAXPAYLOADSIZE) {
+						fprintf(stderr, "packet length exceeded. %d\n",
+								packet->len);
+						packet->len = RTP_MAXPAYLOADSIZE;
+					}
+					memcpy(packet->data, buff + soi_pos, packet->len);
 				}
-				memcpy(packet->data, buff + soi_pos, packet->len);
 			} else {
 				packet->len = data_len;
 				if (packet->len > RTP_MAXPAYLOADSIZE) {
@@ -261,17 +297,19 @@ static void *camx_thread_func(void* arg) {
 				}
 				memcpy(packet->data, buff, packet->len);
 			}
-			pthread_mutex_lock(&active_frame->packets_mlock);
-			active_frame->packets.push_back(packet);
-			pthread_mutex_unlock(&active_frame->packets_mlock);
-			mrevent_trigger(&active_frame->packet_ready);
+			if (packet) {
+				pthread_mutex_lock(&active_frame->packets_mlock);
+				active_frame->packets.push_back(packet);
+				pthread_mutex_unlock(&active_frame->packets_mlock);
+				mrevent_trigger(&active_frame->packet_ready);
+			}
 		}
 	}
 	close(camd_fd);
 	return NULL;
 }
 void init_video_mjpeg(int cam_num, void *user_data) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -284,7 +322,7 @@ void init_video_mjpeg(int cam_num, void *user_data) {
 			camx_thread_func, (void*) lg_send_frame_arg[cam_num]);
 }
 void deinit_video_mjpeg(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
 	}
@@ -297,14 +335,14 @@ void deinit_video_mjpeg(int cam_num) {
 }
 
 float video_mjpeg_get_fps(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->fps;
 }
 int video_mjpeg_get_frameskip(int cam_num) {
-	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1),0);
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return 0;
 	}
