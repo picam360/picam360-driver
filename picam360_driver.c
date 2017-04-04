@@ -295,9 +295,7 @@ static void parse_xml(char *xml) {
 
 	value_str = strstr(xml, "video_delay=");
 	if (value_str) {
-		char cmd[256];
 		float value;
-		int len;
 		sscanf(value_str, "video_delay=\"%f\"", &value);
 		value = MIN(MAX(value, 0), 100);
 		lg_video_delay = value;
