@@ -364,7 +364,7 @@ void *recieve_thread_func(void* arg) {
 	return NULL;
 }
 
-static int rtp_callback(unsigned char *data, int data_len, int pt) {
+static int rtp_callback(unsigned char *data, int data_len, int pt, unsigned int  seq_num) {
 	if (data_len <= 0) {
 		return -1;
 	}
