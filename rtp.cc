@@ -34,26 +34,6 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static bool lg_receive_run = false;
-static pthread_t lg_receive_thread;
-static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
-
-static char lg_record_path[256];
-static int lg_record_fd = -1;
-static pthread_t lg_record_thread;
-static MREVENT_T lg_record_packet_ready;
-static pthread_mutex_t lg_record_packet_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
-static std::list<RTPPacket*> lg_record_packet_queue;
-
-static char lg_load_path[256];
-static int lg_load_fd = -1;
-static pthread_t lg_load_thread;
-
-static RTP_CALLBACK lg_callback = NULL;
-
-static float lg_bandwidth = 0;
-static float lg_bandwidth_limit = 24 * 1024 * 1024; //24Mbps
-
 #ifdef USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
@@ -153,6 +133,27 @@ static MREVENT_T lg_buffering_ready;
 static pthread_mutex_t lg_buffering_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
 static std::list<RTPPacket*> lg_buffering_queue;
 #endif
+
+static bool lg_receive_run = false;
+static pthread_t lg_receive_thread;
+static pthread_mutex_t lg_mlock = PTHREAD_MUTEX_INITIALIZER;
+
+static char lg_record_path[256];
+static int lg_record_fd = -1;
+static pthread_t lg_record_thread;
+static MREVENT_T lg_record_packet_ready;
+static pthread_mutex_t lg_record_packet_queue_mlock = PTHREAD_MUTEX_INITIALIZER;
+static std::list<RTPPacket*> lg_record_packet_queue;
+
+static char lg_load_path[256];
+static int lg_load_fd = -1;
+static pthread_t lg_load_thread;
+
+static RTP_CALLBACK lg_callback = NULL;
+
+static float lg_bandwidth = 0;
+static float lg_bandwidth_limit = 24 * 1024 * 1024; //24Mbps
+
 
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
