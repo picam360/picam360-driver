@@ -12,7 +12,6 @@ CAM1=0
 RPICAM=true
 USBCAM=false
 
-sudo killall socat
 sudo killall picam360-driver.bin
 
 if [ -e cam0 ]; then
@@ -39,6 +38,11 @@ fi
 mkfifo rtp_tx
 chmod 0666 rtp_tx
 
+#use tcp
+#	sudo killall nc
+#   nc -l -p 9006 < rtp_tx > rtp_rx &
+
+sudo killall socat
 socat -u udp-recv:9004 - > rtp_rx &
 socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9002 &
 #socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
