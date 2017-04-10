@@ -59,8 +59,8 @@ elif [ $USBCAM = true ]; then
 
 sudo killall ffmpeg
 
-ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0&
-ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video1 -vcodec copy pipe:1.mjpeg > cam1&
+ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0 2> /dev/null &
+ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video1 -vcodec copy pipe:1.mjpeg > cam1 2> /dev/null &
 
 fi
 
