@@ -9,9 +9,10 @@ CAMERA_HEIGHT=2048
 #CAMERA_HEIGHT=1440
 CAM0=1
 CAM1=0
+RPICAM=true
+USBCAM=false
 
 sudo killall socat
-sudo killall raspivid
 sudo killall picam360-driver.bin
 
 if [ -e cam0 ]; then
@@ -26,13 +27,6 @@ fi
 mkfifo cam1
 chmod 0666 cam1
 
-if [ -e cmd ]; then
-	rm cmd
-fi
-mkfifo cmd
-chmod 0666 cmd
-
-
 if [ -e rtp_rx ]; then
 	rm rtp_rx
 fi
@@ -45,11 +39,14 @@ fi
 mkfifo rtp_tx
 chmod 0666 rtp_tx
 
-sudo killall socat
-#socat -u udp-recv:9004 - > rtp_rx &
+socat -u udp-recv:9004 - > rtp_rx &
 socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9002 &
-socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
-	
+#socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
+
+if [ $RPICAM = true ]; then
+
+sudo killall raspivid
+
 # cam0
 /usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
 #/usr/bin/raspivid -ih -t 0 -ex sports -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 30 -cs $CAM0 -b 2000000 -o - > cam0 &
@@ -57,6 +54,15 @@ socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
 
 # cam1
 /usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
+
+elif [ $USBCAM = true ]; then
+
+sudo killall ffmpeg
+
+ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0&
+ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video1 -vcodec copy pipe:1.mjpeg > cam1&
+
+fi
 
 #wait for i2c available
 sleep 3
