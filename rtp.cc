@@ -262,7 +262,7 @@ static void *buffering_thread_func(void* arg) {
 		pthread_mutex_lock(&lg_buffering_queue_mlock);
 		lg_buffering_queue.push_back(raw_pack);
 		mrevent_trigger(&lg_buffering_ready);
-		pthread_mutex_unlock (&lg_buffering_mlock);
+		pthread_mutex_unlock (&lg_buffering_queue_mlock);
 	}
 	return NULL;
 }
@@ -325,7 +325,7 @@ static void *receive_thread_func(void* arg) {
 		if (lg_buffering_queue.empty()) {
 			mrevent_reset(&lg_buffering_ready);
 		}
-		pthread_mutex_unlock (&lg_buffering_mlock);
+		pthread_mutex_unlock (&lg_buffering_queue_mlock);
 
 		int data_len = raw_pack->GetPacketLength();
 		unsigned char *buff = raw_pack->GetPacketData();
@@ -587,7 +587,7 @@ int init_rtp(unsigned short portbase, char *destip_str,
 	checkerror(status);
 #else
 	lg_tx_fd = open("rtp_tx", O_WRONLY);
-	pthread_create(&lg_buffering_thread, NULL, receive_buffering_func,
+	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func,
 			(void*) NULL);
 	mrevent_init(&lg_buffering_ready);
 #endif
