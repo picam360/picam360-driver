@@ -31,11 +31,6 @@ int lg_cmd_fd = -1;
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
-//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
-static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
-//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
-static float lg_compass[4] = { };
 static int lg_light0_id = 4;
 static int lg_light1_id = 34;
 static int lg_motor0_id = 18;
@@ -90,35 +85,6 @@ int xmp(char *buff, int buff_len) {
 		quat[3] = lg_quatanion_queue[cur][3];
 	}
 
-	{ //compas : calibration
-		float calib[3];
-		float bias[3];
-		float gain[3];
-		for (int i = 0; i < 3; i++) {
-			lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-			lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
-			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
-			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
-		}
-
-		//fprintf(stderr, "%f,%f,%f:%f,%f,%f:%f,%f,%f\n",
-		//compass[0],compass[1],compass[2],
-		//lg_compass_min[0],lg_compass_min[1],lg_compass_min[2],
-		//lg_compass_max[0],lg_compass_max[1],lg_compass_max[2]
-		//);
-
-		float norm = sqrt(
-				calib[0] * calib[0] + calib[1] * calib[1]
-						+ calib[2] * calib[2]);
-		for (int i = 0; i < 3; i++) {
-			calib[i] /= norm;
-		}
-		lg_compass[0] = calib[0];
-		lg_compass[1] = calib[1];
-		lg_compass[2] = calib[2];
-	}
-
 	xmp_len = 0;
 	buff[xmp_len++] = 0xFF;
 	buff[xmp_len++] = 0xE1;
@@ -142,7 +108,7 @@ int xmp(char *buff, int buff_len) {
 			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
 			quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-			lg_compass[0], lg_compass[1], lg_compass[2]);
+			compass[0], compass[1], compass[2]);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
 	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
 			rtp_get_bandwidth());
@@ -364,7 +330,8 @@ void *recieve_thread_func(void* arg) {
 	return NULL;
 }
 
-static int rtp_callback(unsigned char *data, int data_len, int pt, unsigned int  seq_num) {
+static int rtp_callback(unsigned char *data, int data_len, int pt,
+		unsigned int seq_num) {
 	if (data_len <= 0) {
 		return -1;
 	}
