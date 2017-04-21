@@ -47,7 +47,7 @@ static float lg_dir[4] = { -1, 1, -1, 1 };
 #define MAX_DELAY_COUNT 256
 static float lg_video_delay = 0;
 static int lg_video_delay_cur = 0;
-static float lg_quatanion_queue[MAX_DELAY_COUNT][4] = { };
+static float lg_quaternion_queue[MAX_DELAY_COUNT][4] = { };
 
 bool init_pwm() {
 	ms_open();
@@ -79,10 +79,10 @@ int xmp(char *buff, int buff_len) {
 	{
 		int cur = (lg_video_delay_cur - (int) lg_video_delay + MAX_DELAY_COUNT)
 				% MAX_DELAY_COUNT;
-		quat[0] = lg_quatanion_queue[cur][0];
-		quat[1] = lg_quatanion_queue[cur][1];
-		quat[2] = lg_quatanion_queue[cur][2];
-		quat[3] = lg_quatanion_queue[cur][3];
+		quat[0] = lg_quaternion_queue[cur][0];
+		quat[1] = lg_quaternion_queue[cur][1];
+		quat[2] = lg_quaternion_queue[cur][2];
+		quat[3] = lg_quaternion_queue[cur][3];
 	}
 
 	xmp_len = 0;
@@ -138,10 +138,10 @@ void *transmit_thread_func(void* arg) {
 		{
 			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
 			ms_update();
-			lg_quatanion_queue[cur][0] = quatanion[0];
-			lg_quatanion_queue[cur][1] = quatanion[1];
-			lg_quatanion_queue[cur][2] = quatanion[2];
-			lg_quatanion_queue[cur][3] = quatanion[3];
+			lg_quaternion_queue[cur][0] = quaternion[0];
+			lg_quaternion_queue[cur][1] = quaternion[1];
+			lg_quaternion_queue[cur][2] = quaternion[2];
+			lg_quaternion_queue[cur][3] = quaternion[3];
 			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
