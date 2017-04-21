@@ -206,8 +206,10 @@ static void *camx_thread_func(void* arg) {
 				marker = 0;
 				if (buff[i] == 0xD8) { //SOI
 					framecount++;
-					if ((framecount % (send_frame_arg->skip_frame + 1)) == 0
-							&& soicount == 0) {
+					if ((framecount % (send_frame_arg->skip_frame + 1)) != 0) {
+						continue;
+					}
+					if (soicount == 0) {
 						soi_pos = (i - 1);
 						active_frame = new _FRAME_T;
 
@@ -354,7 +356,7 @@ int video_mjpeg_get_frameskip(int cam_num) {
 	return lg_send_frame_arg[cam_num]->frameskip;
 }
 
-void video_mjpeg_set_skip_frame(int cam_num, int value);
+void video_mjpeg_set_skip_frame(int cam_num, int value)
 {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {

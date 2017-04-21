@@ -236,6 +236,7 @@ static void *transmit_thread_func(void* arg) {
 		}
 		usleep(10 * 1000); //less than 100Hz
 	}
+	return NULL;
 }
 
 static void parse_xml(char *xml) {
@@ -462,11 +463,9 @@ static void init_options() {
 			lg_compass_max[i] = json_number_value(
 					json_object_get(options, buff));
 		}
+
+		json_decref(options);
 	}
-
-	json_dump_file(options, CONFIG_FILE, 0);
-
-	json_decref(options);
 }
 
 static void save_options() {
@@ -483,6 +482,10 @@ static void save_options() {
 		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
 	}
+
+	json_dump_file(options, CONFIG_FILE, 0);
+
+	json_decref(options);
 }
 
 int main(int argc, char *argv[]) {
