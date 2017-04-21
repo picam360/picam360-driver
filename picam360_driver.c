@@ -18,13 +18,24 @@
 
 #include "rtp.h"
 #include "video_mjpeg.h"
+#include "quaternion.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define CONFIG_FILE "config.json"
+#define PLUGIN_NAME "picam_360_driver"
+
 #define PT_STATUS 100
 #define PT_CMD 101
 int lg_cmd_fd = -1;
+
+static bool lg_is_compass_calib = false;
+static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
+//static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
+static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
+//static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
@@ -49,7 +60,37 @@ static float lg_video_delay = 0;
 static int lg_video_delay_cur = 0;
 static float lg_quaternion_queue[MAX_DELAY_COUNT][4] = { };
 
-bool init_pwm() {
+static int lg_ack_command_id = 0;
+
+static void init_options();
+static void save_options();
+
+static void command_handler(const char *_buff) {
+	char buff[256];
+	strncpy(buff, _buff, sizeof(buff));
+	char *cmd;
+	cmd = strtok(buff, " \n");
+	if (cmd == NULL) {
+		//do nothing
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
+			== 0) {
+		lg_is_compass_calib = true;
+		for (int i = 0; i < 3; i++) {
+			lg_compass_min[i] = INT_MAX;
+			lg_compass_max[i] = -INT_MAX;
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
+			== 0) {
+		lg_is_compass_calib = false;
+	} else if (strncmp(cmd, PLUGIN_NAME ".save", sizeof(buff))
+			== 0) {
+		save_options();
+	} else {
+		printf(":unknown command : %s\n", buff);
+	}
+}
+
+static bool init_pwm() {
 	ms_open();
 	int fd = open("/dev/pi-blaster", O_WRONLY);
 	if (fd > 0) {
@@ -72,7 +113,7 @@ bool init_pwm() {
 	return true;
 }
 
-int xmp(char *buff, int buff_len) {
+static int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
 	float quat[4];
@@ -83,6 +124,31 @@ int xmp(char *buff, int buff_len) {
 		quat[1] = lg_quaternion_queue[cur][1];
 		quat[2] = lg_quaternion_queue[cur][2];
 		quat[3] = lg_quaternion_queue[cur][3];
+	}
+	{
+		float calib[3];
+		float bias[3];
+		float gain[3];
+		for (int i = 0; i < 3; i++) {
+			if (lg_is_compass_calib) {
+				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+			}
+			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
+		}
+		float norm = sqrt(
+				calib[0] * calib[0] + calib[1] * calib[1]
+						+ calib[2] * calib[2]);
+		for (int i = 0; i < 3; i++) {
+			calib[i] /= norm;
+		}
+		//convert from mpu coodinate to opengl coodinate
+		lg_compass.ary[0] = calib[0];
+		lg_compass.ary[1] = calib[1];
+		lg_compass.ary[2] = calib[2];
+		lg_compass.ary[3] = 1.0;
 	}
 
 	xmp_len = 0;
@@ -108,7 +174,15 @@ int xmp(char *buff, int buff_len) {
 			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
 			quat[1], quat[2], quat[3]);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-			compass[0], compass[1], compass[2]);
+			lg_compass.ary[0], lg_compass.ary[1], lg_compass.ary[2]);
+	if (lg_is_compass_calib) {
+		xmp_len += sprintf(buff + xmp_len,
+				"<compass_min x=\"%f\" y=\"%f\" z=\"%f\" />", lg_compass_min[0],
+				lg_compass_min[1], lg_compass_min[2]);
+		xmp_len += sprintf(buff + xmp_len,
+				"<compass_max x=\"%f\" y=\"%f\" z=\"%f\" />", lg_compass_max[0],
+				lg_compass_max[1], lg_compass_max[2]);
+	}
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", temp);
 	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
 			rtp_get_bandwidth());
@@ -117,6 +191,7 @@ int xmp(char *buff, int buff_len) {
 				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
 				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
 	}
+	xmp_len += sprintf(buff + xmp_len, "<ack_command_id v=\"%d\" />", lg_ack_command_id);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -128,7 +203,7 @@ int xmp(char *buff, int buff_len) {
 	return xmp_len;
 }
 
-void *transmit_thread_func(void* arg) {
+static void *transmit_thread_func(void* arg) {
 	int count = 0;
 	int xmp_len = 0;
 	int buff_size = RTP_MAXPAYLOADSIZE;
@@ -267,10 +342,26 @@ static void parse_xml(char *xml) {
 		lg_video_delay = value;
 	}
 
+	value_str = strstr(xml, "command_id=");
+	if (value_str) {
+		int command_id;
+		sscanf(value_str, "command_id=\"%d\"", command_id);
+		if (command_id != lg_ack_command_id) {
+			lg_ack_command_id = command_id;
+
+			value_str = strstr(xml, "command=");
+			if (value_str) {
+				char command[1024];
+				sscanf(value_str, "command=\"%[^\"]\"", command);
+				command_handler(command);
+			}
+		}
+	}
+
 	close(fd);
 }
 
-void *recieve_thread_func(void* arg) {
+static void *recieve_thread_func(void* arg) {
 	int buff_size = 4096;
 	unsigned char *buff = malloc(buff_size);
 	int data_len = 0;
@@ -349,8 +440,45 @@ static int rtp_callback(unsigned char *data, int data_len, int pt,
 	return 0;
 }
 
+static void init_options() {
+	json_error_t error;
+	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
+	if (options == NULL) {
+		fputs(error.text, stderr);
+	} else {
+		for (int i = 0; i < 3; i++) {
+			char buff[256];
+			sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+			lg_compass_min[i] = json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+			lg_compass_max[i] = json_number_value(
+					json_object_get(options, buff));
+		}
+	}
+
+	json_dump_file(options, CONFIG_FILE, 0);
+
+	json_decref(options);
+}
+
+static void save_options() {
+	json_t *options = json_object();
+
+	for (int i = 0; i < 3; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
+		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
+		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
+	}
+}
+
 int main(int argc, char *argv[]) {
 	bool succeeded;
+
+	//init options
+	init_options();
 
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
