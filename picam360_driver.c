@@ -345,14 +345,6 @@ static void parse_xml(char *xml) {
 		}
 	}
 
-	value_str = strstr(xml, "video_delay=");
-	if (value_str) {
-		float value;
-		sscanf(value_str, "video_delay=\"%f\"", &value);
-		value = MIN(MAX(value, 0), 100);
-		lg_video_delay = value;
-	}
-
 	value_str = strstr(xml, "command_id=");
 	if (value_str) {
 		int command_id;
