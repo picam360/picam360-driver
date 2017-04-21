@@ -74,6 +74,7 @@ public:
 	_SENDFRAME_ARG_T() {
 		cam_run = false;
 		cam_num = 0;
+		skip_frame = 0;
 		framecount = 0;
 		fps = 0;
 		frameskip = 0;
@@ -82,6 +83,7 @@ public:
 	}
 	bool cam_run;
 	int cam_num;
+	int skip_frame;
 	int framecount;
 	float fps;
 	int frameskip;
@@ -193,6 +195,7 @@ static void *camx_thread_func(void* arg) {
 
 	int marker = 0;
 	int soicount = 0;
+	int framecount = 0;
 	_FRAME_T *active_frame = NULL;
 	while (send_frame_arg->cam_run) {
 		int soi_pos = INT_MIN;
@@ -202,7 +205,9 @@ static void *camx_thread_func(void* arg) {
 			if (marker) {
 				marker = 0;
 				if (buff[i] == 0xD8) { //SOI
-					if (soicount == 0) {
+					framecount++;
+					if ((framecount % (send_frame_arg->skip_frame + 1)) == 0
+							&& soicount == 0) {
 						soi_pos = (i - 1);
 						active_frame = new _FRAME_T;
 
@@ -347,4 +352,13 @@ int video_mjpeg_get_frameskip(int cam_num) {
 		return 0;
 	}
 	return lg_send_frame_arg[cam_num]->frameskip;
+}
+
+void video_mjpeg_set_skip_frame(int cam_num, int value);
+{
+	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
+	if (!lg_send_frame_arg[cam_num]) {
+		return;
+	}
+	lg_send_frame_arg[cam_num]->skip_frame = value;
 }

@@ -1,7 +1,7 @@
 OBJS=picam360_driver.o rtp.o video_mjpeg.o mrevent.o \
 	 libs/MotionSensor/libMotionSensor.a libs/libI2Cdev.a
 BIN=picam360-driver.bin
-LDFLAGS+=
+LDFLAGS+=-ljansson
 
 include Makefile.include
 

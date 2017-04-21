@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <limits.h>
+#include <jansson.h> //json parser
 
 #include "picam360_driver.h"
 #include "MotionSensor.h"
@@ -24,7 +25,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define CONFIG_FILE "config.json"
-#define PLUGIN_NAME "picam_360_driver"
+#define PLUGIN_NAME "picam360_driver"
 
 #define PT_STATUS 100
 #define PT_CMD 101
@@ -60,6 +61,7 @@ static float lg_video_delay = 0;
 static int lg_video_delay_cur = 0;
 static float lg_quaternion_queue[MAX_DELAY_COUNT][4] = { };
 
+static int lg_skip_frame = 0;
 static int lg_ack_command_id = 0;
 
 static void init_options();
@@ -82,8 +84,16 @@ static void command_handler(const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
 			== 0) {
 		lg_is_compass_calib = false;
-	} else if (strncmp(cmd, PLUGIN_NAME ".save", sizeof(buff))
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
 			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value = 0;
+			sscanf(param, "%f", &value);
+			lg_video_delay = MAX(MIN(value,MAX_DELAY_COUNT), 0);
+			printf("set_video_delay : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".save", sizeof(buff)) == 0) {
 		save_options();
 	} else {
 		printf(":unknown command : %s\n", buff);
@@ -191,7 +201,8 @@ static int xmp(char *buff, int buff_len) {
 				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
 				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
 	}
-	xmp_len += sprintf(buff + xmp_len, "<ack_command_id v=\"%d\" />", lg_ack_command_id);
+	xmp_len += sprintf(buff + xmp_len, "<ack_command_id v=\"%d\" />",
+			lg_ack_command_id);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -345,7 +356,7 @@ static void parse_xml(char *xml) {
 	value_str = strstr(xml, "command_id=");
 	if (value_str) {
 		int command_id;
-		sscanf(value_str, "command_id=\"%d\"", command_id);
+		sscanf(value_str, "command_id=\"%d\"", &command_id);
 		if (command_id != lg_ack_command_id) {
 			lg_ack_command_id = command_id;
 
@@ -446,6 +457,10 @@ static void init_options() {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
+		lg_skip_frame = json_number_value(
+				json_object_get(options, "skip_frame"));
+		lg_video_delay = json_number_value(
+				json_object_get(options, "video_delay"));
 		for (int i = 0; i < 3; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
@@ -465,6 +480,10 @@ static void init_options() {
 static void save_options() {
 	json_t *options = json_object();
 
+	json_object_set_new(options, "skip_frame",
+			json_real(lg_skip_frame));
+	json_object_set_new(options, "video_delay",
+			json_real(lg_video_delay));
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
@@ -487,6 +506,8 @@ int main(int argc, char *argv[]) {
 	set_video_mjpeg_xmp_callback(xmp);
 	init_video_mjpeg(0, NULL);
 	init_video_mjpeg(1, NULL);
+	video_mjpeg_set_skip_frame(0, lg_skip_frame);
+	video_mjpeg_set_skip_frame(1, lg_skip_frame);
 
 	succeeded = init_pwm();
 	if (!succeeded) {
