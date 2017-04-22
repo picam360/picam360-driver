@@ -36,7 +36,11 @@ static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
 static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
+static VECTOR4D_T lg_quat = { };
+static VECTOR4D_T lg_quat_after_offset = { };
 static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
+static float lg_north = 0;
+static int lg_north_count = 0;
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
@@ -59,7 +63,7 @@ static float lg_dir[4] = { -1, 1, -1, 1 };
 #define MAX_DELAY_COUNT 256
 static float lg_video_delay = 0;
 static int lg_video_delay_cur = 0;
-static float lg_quaternion_queue[MAX_DELAY_COUNT][4] = { };
+static VECTOR4D_T lg_quaternion_queue[MAX_DELAY_COUNT] = { };
 
 static int lg_skip_frame = 0;
 static int lg_ack_command_id = 0;
@@ -126,39 +130,11 @@ static bool init_pwm() {
 static int xmp(char *buff, int buff_len) {
 	int xmp_len = 0;
 
-	float quat[4];
+	static VECTOR4D_T quat = { };
 	{
 		int cur = (lg_video_delay_cur - (int) lg_video_delay + MAX_DELAY_COUNT)
 				% MAX_DELAY_COUNT;
-		quat[0] = lg_quaternion_queue[cur][0];
-		quat[1] = lg_quaternion_queue[cur][1];
-		quat[2] = lg_quaternion_queue[cur][2];
-		quat[3] = lg_quaternion_queue[cur][3];
-	}
-	{
-		float calib[3];
-		float bias[3];
-		float gain[3];
-		for (int i = 0; i < 3; i++) {
-			if (lg_is_compass_calib) {
-				lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
-				lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
-			}
-			bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
-			gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-			calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
-		}
-		float norm = sqrt(
-				calib[0] * calib[0] + calib[1] * calib[1]
-						+ calib[2] * calib[2]);
-		for (int i = 0; i < 3; i++) {
-			calib[i] /= norm;
-		}
-		//convert from mpu coodinate to opengl coodinate
-		lg_compass.ary[0] = calib[0];
-		lg_compass.ary[1] = calib[1];
-		lg_compass.ary[2] = calib[2];
-		lg_compass.ary[3] = 1.0;
+		quat = lg_quaternion_queue[cur];
 	}
 
 	xmp_len = 0;
@@ -181,8 +157,8 @@ static int xmp(char *buff, int buff_len) {
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-			"<quaternion w=\"%f\" x=\"%f\" y=\"%f\" z=\"%f\" />", quat[0],
-			quat[1], quat[2], quat[3]);
+			"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.ary[0],
+			quat.ary[1], quat.ary[2], quat.ary[3]);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
 			lg_compass.ary[0], lg_compass.ary[1], lg_compass.ary[2]);
 	if (lg_is_compass_calib) {
@@ -221,13 +197,84 @@ static void *transmit_thread_func(void* arg) {
 	char buff[RTP_MAXPAYLOADSIZE];
 	while (1) {
 		count++;
+		ms_update();
+		{ //compas : calibration
+			float calib[3];
+			float bias[3];
+			float gain[3];
+			for (int i = 0; i < 3; i++) {
+				if (lg_is_compass_calib) {
+					lg_compass_min[i] = MIN(lg_compass_min[i], compass[i]);
+					lg_compass_max[i] = MAX(lg_compass_max[i], compass[i]);
+				}
+				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
+				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
+				calib[i] = (compass[i] - bias[i])
+						/ (gain[i] == 0 ? 1 : gain[i]);
+			}
+			float norm = sqrt(
+					calib[0] * calib[0] + calib[1] * calib[1]
+							+ calib[2] * calib[2]);
+			for (int i = 0; i < 3; i++) {
+				calib[i] /= norm;
+			}
+			//convert from mpu coodinate to opengl coodinate
+			lg_compass.ary[0] = calib[1];
+			lg_compass.ary[1] = -calib[0];
+			lg_compass.ary[2] = -calib[2];
+			lg_compass.ary[3] = 1.0;
+		}
+		{ //quat : convert from mpu coodinate to opengl coodinate
+			lg_quat.ary[0] = quaternion[1];	//x
+			lg_quat.ary[1] = quaternion[3];	//y : swap y and z
+			lg_quat.ary[2] = -quaternion[2];	//z : swap y and z
+			lg_quat.ary[3] = quaternion[0];	//w
+		}
+		{ //north
+			float north = 0;
+
+			float matrix[16];
+			mat4_fromQuat(matrix, lg_quat.ary);
+			mat4_invert(matrix, matrix);
+
+			float compass_mat[16] = { };
+			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
+
+			mat4_transpose(compass_mat, compass_mat);
+			mat4_multiply(compass_mat, compass_mat, matrix);
+			mat4_transpose(compass_mat, compass_mat);
+
+			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+
+			lg_north = (lg_north * lg_north_count + north)
+					/ (lg_north_count + 1);
+			lg_north_count++;
+			if (lg_north_count > 100) {
+				lg_north_count = 100;
+			}
+		}
+		{ //calib
+			VECTOR4D_T quat_offset = quaternion_init();
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_z(lg_offset_roll));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_x(lg_offset_pitch));
+			quat_offset = quaternion_multiply(quat_offset,
+					quaternion_get_from_y(lg_offset_yaw));
+			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			lg_quat_after_offset = quaternion_multiply(
+					quaternion_get_from_y(-lg_north * M_PI / 180),
+					lg_quat_after_offset); // Rv=RvoRvRn
+
+			float x, y, z;
+			quaternion_get_euler(lg_quat_after_offset, &y, &x, &z,
+					EULER_SEQUENCE_YXZ);
+			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+					y * 180 / M_PI, z * 180 / M_PI);
+		}
 		{
 			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
-			ms_update();
-			lg_quaternion_queue[cur][0] = quaternion[0];
-			lg_quaternion_queue[cur][1] = quaternion[1];
-			lg_quaternion_queue[cur][2] = quaternion[2];
-			lg_quaternion_queue[cur][3] = quaternion[3];
+			lg_quaternion_queue[cur] = lg_quat_after_offset;
 			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
@@ -471,10 +518,8 @@ static void init_options() {
 static void save_options() {
 	json_t *options = json_object();
 
-	json_object_set_new(options, "skip_frame",
-			json_real(lg_skip_frame));
-	json_object_set_new(options, "video_delay",
-			json_real(lg_video_delay));
+	json_object_set_new(options, "skip_frame", json_real(lg_skip_frame));
+	json_object_set_new(options, "video_delay", json_real(lg_video_delay));
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
