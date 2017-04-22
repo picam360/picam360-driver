@@ -37,7 +37,6 @@ static float lg_compass_min[3] = { -708.000000, -90.000000, -173.000000 };
 static float lg_compass_max[3] = { -47.000000, 536.000000, 486.000000 };
 //static float lg_compass_max[3] = { -INT_MAX, -INT_MAX, -INT_MAX };
 static VECTOR4D_T lg_quat = { };
-static VECTOR4D_T lg_quat_after_offset = { };
 static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
 static float lg_north = 0;
 static int lg_north_count = 0;
@@ -157,10 +156,10 @@ static int xmp(char *buff, int buff_len) {
 					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
 	xmp_len += sprintf(buff + xmp_len,
-			"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.ary[0],
-			quat.ary[1], quat.ary[2], quat.ary[3]);
+			"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x,
+			quat.y, quat.z, quat.w);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-			lg_compass.ary[0], lg_compass.ary[1], lg_compass.ary[2]);
+			lg_compass.x, lg_compass.y, lg_compass.z);
 	if (lg_is_compass_calib) {
 		xmp_len += sprintf(buff + xmp_len,
 				"<compass_min x=\"%f\" y=\"%f\" z=\"%f\" />", lg_compass_min[0],
@@ -255,26 +254,26 @@ static void *transmit_thread_func(void* arg) {
 		}
 		{ //calib
 			VECTOR4D_T quat_offset = quaternion_init();
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_z(lg_offset_roll));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_x(lg_offset_pitch));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_y(lg_offset_yaw));
-			lg_quat_after_offset = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
-			lg_quat_after_offset = quaternion_multiply(
+			//quat_offset = quaternion_multiply(quat_offset,
+			//		quaternion_get_from_z(lg_offset_roll));
+			//quat_offset = quaternion_multiply(quat_offset,
+			//		quaternion_get_from_x(lg_offset_pitch));
+			//quat_offset = quaternion_multiply(quat_offset,
+			//		quaternion_get_from_y(lg_offset_yaw));
+			lg_quat = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			lg_quat = quaternion_multiply(
 					quaternion_get_from_y(-lg_north * M_PI / 180),
-					lg_quat_after_offset); // Rv=RvoRvRn
+					lg_quat); // Rv=RvoRvRn
 
 			float x, y, z;
-			quaternion_get_euler(lg_quat_after_offset, &y, &x, &z,
+			quaternion_get_euler(lg_quat, &y, &x, &z,
 					EULER_SEQUENCE_YXZ);
 			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
 					y * 180 / M_PI, z * 180 / M_PI);
 		}
 		{
 			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
-			lg_quaternion_queue[cur] = lg_quat_after_offset;
+			lg_quaternion_queue[cur] = lg_quat;
 			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
