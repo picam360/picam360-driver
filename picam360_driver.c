@@ -21,6 +21,11 @@
 #include "video_mjpeg.h"
 #include "quaternion.h"
 
+#include <mat4/multiply.h>
+#include <mat4/transpose.h>
+#include <mat4/fromQuat.h>
+#include <mat4/invert.h>
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
