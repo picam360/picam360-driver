@@ -269,12 +269,6 @@ static void *transmit_thread_func(void* arg) {
 			lg_quat = quaternion_multiply(
 					quaternion_get_from_y(-lg_north * M_PI / 180),
 					lg_quat); // Rv=RvoRvRn
-
-			float x, y, z;
-			quaternion_get_euler(lg_quat, &y, &x, &z,
-					EULER_SEQUENCE_YXZ);
-			printf("north %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
-					y * 180 / M_PI, z * 180 / M_PI);
 		}
 		{
 			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
