@@ -194,6 +194,16 @@ static int xmp(char *buff, int buff_len) {
 	return xmp_len;
 }
 
+static float sub_angle(float a, float b) {
+	float v = a - b;
+	v -= floor(v / 360) * 360;
+	if (v > 180.0) {
+		v -= 360.0;
+	}
+	return v;
+}
+
+static bool lg_debugdump = false;
 static void *transmit_thread_func(void* arg) {
 	int count = 0;
 	int xmp_len = 0;
@@ -243,32 +253,49 @@ static void *transmit_thread_func(void* arg) {
 
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
+			if (lg_debugdump) {
+				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0],
+						compass_mat[1], compass_mat[2]);
+			}
 
 			mat4_transpose(compass_mat, compass_mat);
 			mat4_multiply(compass_mat, compass_mat, matrix);
 			mat4_transpose(compass_mat, compass_mat);
 
-			north = -atan2(compass_mat[2], compass_mat[0]) * 180 / M_PI;
+			if (lg_debugdump) {
+				printf("compass2 %f : %f, %f, %f\n", lg_north, compass_mat[0],
+						compass_mat[1], compass_mat[2]);
+			}
 
-			lg_north = (lg_north * lg_north_count + north)
-					/ (lg_north_count + 1);
+			north = -atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
+
+			lg_north = lg_north
+					+ sub_angle(north, lg_north) / (lg_north_count + 1);
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
 			}
 		}
 		{ //calib
-			VECTOR4D_T quat_offset = quaternion_init();
-			//quat_offset = quaternion_multiply(quat_offset,
-			//		quaternion_get_from_z(lg_offset_roll));
-			//quat_offset = quaternion_multiply(quat_offset,
-			//		quaternion_get_from_x(lg_offset_pitch));
-			//quat_offset = quaternion_multiply(quat_offset,
-			//		quaternion_get_from_y(lg_offset_yaw));
+			float x, y, z;
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 			lg_quat = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 			lg_quat = quaternion_multiply(
-					quaternion_get_from_y(-lg_north * M_PI / 180),
-					lg_quat); // Rv=RvoRvRn
+					quaternion_get_from_y(-lg_north * M_PI / 180), lg_quat); // Rv=RvoRvRn
+			if (lg_debugdump) {
+				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
+						y * 180 / M_PI, z * 180 / M_PI);
+			}
 		}
 		{
 			int cur = (lg_video_delay_cur + 1) % MAX_DELAY_COUNT;
