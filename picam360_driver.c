@@ -283,12 +283,6 @@ static void *transmit_thread_func(void* arg) {
 				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
 						y * 180 / M_PI, z * 180 / M_PI);
 			}
-			lg_quat = quaternion_multiply(lg_quat, quat_offset); // Rv=RvoRv
-			if (lg_debugdump) {
-				quaternion_get_euler(lg_quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
-						y * 180 / M_PI, z * 180 / M_PI);
-			}
 			lg_quat = quaternion_multiply(
 					quaternion_get_from_y(-lg_north * M_PI / 180), lg_quat); // Rv=RvoRvRn
 			if (lg_debugdump) {
