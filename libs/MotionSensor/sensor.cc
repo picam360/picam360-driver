@@ -11,6 +11,7 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
+#include "I2Cdev.h"
 #include "inv_mpu_lib/inv_mpu.h"
 #include "inv_mpu_lib/inv_mpu_dmp_motion_driver.h"
 #ifdef __cplusplus
@@ -53,11 +54,17 @@ float compass[3];
 
 uint8_t rate = 40;
 
-int ms_open() {
+int ms_open(int i2c_ch) {
 	dmpReady=1;
 	initialized = 0;
 	for (int i=0;i<DIM;i++){
 		lastval[i]=10;
+	}
+
+	{//i2c
+		char buff[256];
+		sprintf(buff, "/dev/i2c-%d", i2c_ch);
+		setDeviceFilePath(buff);
 	}
 
 	// initialize device

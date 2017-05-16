@@ -17,7 +17,6 @@
 #include "picam360_driver.h"
 #include "MotionSensor.h"
 
-#include "I2Cdev.h"
 #include "rtp.h"
 #include "video_mjpeg.h"
 #include "quaternion.h"
@@ -576,12 +575,6 @@ int main(int argc, char *argv[]) {
 
 	//init options
 	init_options();
-
-	{//i2c
-		char buff[256];
-		sprintf(buff, "/dev/i2c-%d", i);
-		setDeviceFilePath();
-	}
 
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 

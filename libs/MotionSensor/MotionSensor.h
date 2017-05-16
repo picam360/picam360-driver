@@ -16,7 +16,7 @@ extern float gyro[3];
 extern float temp;
 extern float compass[3];
 
-extern int ms_open();
+extern int ms_open(int i2c_ch);
 extern int ms_update();
 extern int ms_close();
 
