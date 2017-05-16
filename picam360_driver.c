@@ -51,12 +51,8 @@ static int lg_north_count = 0;
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-static int lg_light0_id = 4;
-static int lg_light1_id = 34;
-static int lg_motor0_id = 18;
-static int lg_motor1_id = 36;
-static int lg_motor2_id = 35;
-static int lg_motor3_id = 17;
+static int lg_light_id = { 4, 34 };
+static int lg_motor_id = { 18, 36, 35, 17 };
 
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
@@ -114,17 +110,17 @@ static bool init_pwm() {
 	if (fd > 0) {
 		char cmd[256];
 		int len;
-		len = sprintf(cmd, "%d=%f\n", lg_light0_id, 0.0f);
+		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light1_id, 0.0f);
+		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor0_id, MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], MOTOR_CENTER);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor1_id, MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], MOTOR_CENTER);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor2_id, MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], MOTOR_CENTER);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor3_id, MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], MOTOR_CENTER);
 		write(fd, cmd, len);
 		close(fd);
 	}
@@ -323,7 +319,7 @@ static void parse_xml(char *xml) {
 			lg_light_value[0] = value;
 
 			value = pow(value / 100, 3);
-			len = sprintf(cmd, "%d=%f\n", lg_light0_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -339,7 +335,7 @@ static void parse_xml(char *xml) {
 			lg_light_value[1] = value;
 
 			value = pow(value / 100, 3);
-			len = sprintf(cmd, "%d=%f\n", lg_light1_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_light_id[1], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -356,7 +352,7 @@ static void parse_xml(char *xml) {
 
 			value = lg_dir[0] * (value / 100) * MOTOR_RANGE
 					+ MOTOR_BASE(lg_dir[0] * value);
-			len = sprintf(cmd, "%d=%f\n", lg_motor0_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -373,7 +369,7 @@ static void parse_xml(char *xml) {
 
 			value = lg_dir[1] * (value / 100) * MOTOR_RANGE
 					+ MOTOR_BASE(lg_dir[1] * value);
-			len = sprintf(cmd, "%d=%f\n", lg_motor1_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -390,7 +386,7 @@ static void parse_xml(char *xml) {
 
 			value = lg_dir[2] * (value / 100) * MOTOR_RANGE
 					+ MOTOR_BASE(lg_dir[2] * value);
-			len = sprintf(cmd, "%d=%f\n", lg_motor2_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -407,7 +403,7 @@ static void parse_xml(char *xml) {
 
 			value = lg_dir[3] * (value / 100) * MOTOR_RANGE
 					+ MOTOR_BASE(lg_dir[3] * value);
-			len = sprintf(cmd, "%d=%f\n", lg_motor3_id, value);
+			len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], value);
 			write(fd, cmd, len);
 		}
 	}
@@ -528,6 +524,24 @@ static void init_options() {
 			sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
 			lg_compass_max[i] = json_number_value(
 					json_object_get(options, buff));
+		}
+
+		for (int i = 0; i < 2; i++) {
+			char buff[256];
+			sprintf(buff, PLUGIN_NAME ".light%d_id", i);
+			int id = (int) json_number_value(json_object_get(options, buff));
+			if (id != 0) {
+				lg_light_id[i] = id;
+			}
+		}
+
+		for (int i = 0; i < 4; i++) {
+			char buff[256];
+			sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
+			int id = (int) json_number_value(json_object_get(options, buff));
+			if (id != 0) {
+				lg_motor_id[i] = id;
+			}
 		}
 
 		json_decref(options);
