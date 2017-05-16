@@ -515,11 +515,11 @@ static void init_options() {
 		fputs(error.text, stderr);
 	} else {
 		lg_skip_frame = json_number_value(
-				json_object_get(options, PLUGIN_NAME "skip_frame"));
+				json_object_get(options, PLUGIN_NAME ".skip_frame"));
 		lg_video_delay = json_number_value(
-				json_object_get(options, PLUGIN_NAME "video_delay"));
+				json_object_get(options, PLUGIN_NAME ".video_delay"));
 		lg_i2c_ch = json_number_value(
-				json_object_get(options, PLUGIN_NAME "lg_i2c_ch"));
+				json_object_get(options, PLUGIN_NAME ".i2c_ch"));
 		for (int i = 0; i < 3; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
