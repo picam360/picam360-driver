@@ -107,7 +107,7 @@ static void command_handler(const char *_buff) {
 }
 
 static bool init_pwm() {
-	ms_open();
+	ms_open(lg_i2c_ch);
 	int fd = open("/dev/pi-blaster", O_WRONLY);
 	if (fd > 0) {
 		char cmd[256];

@@ -11,7 +11,7 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
-#include "I2Cdev.h"
+#include "..I2Cdev/I2Cdev.h"
 #include "inv_mpu_lib/inv_mpu.h"
 #include "inv_mpu_lib/inv_mpu_dmp_motion_driver.h"
 #ifdef __cplusplus
