@@ -17,6 +17,7 @@
 #include "picam360_driver.h"
 #include "MotionSensor.h"
 
+#include "I2Cdev.h"
 #include "rtp.h"
 #include "video_mjpeg.h"
 #include "quaternion.h"
@@ -46,16 +47,18 @@ static VECTOR4D_T lg_compass = { .ary = { 0, 0, 0, 1 } };
 static float lg_north = 0;
 static int lg_north_count = 0;
 
+static int lg_i2c_ch = 1;
+
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-static int lg_light_id = { 4, 34 };
-static int lg_motor_id = { 18, 36, 35, 17 };
-
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
+static int lg_light_id[LIGHT_NUM] = { 4, 34 };
+static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
+
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_dir[4] = { -1, 1, -1, 1 };
@@ -513,9 +516,11 @@ static void init_options() {
 		fputs(error.text, stderr);
 	} else {
 		lg_skip_frame = json_number_value(
-				json_object_get(options, "skip_frame"));
+				json_object_get(options, PLUGIN_NAME "skip_frame"));
 		lg_video_delay = json_number_value(
-				json_object_get(options, "video_delay"));
+				json_object_get(options, PLUGIN_NAME "video_delay"));
+		lg_i2c_ch = json_number_value(
+				json_object_get(options, PLUGIN_NAME "lg_i2c_ch"));
 		for (int i = 0; i < 3; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
@@ -526,7 +531,7 @@ static void init_options() {
 					json_object_get(options, buff));
 		}
 
-		for (int i = 0; i < 2; i++) {
+		for (int i = 0; i < LIGHT_NUM; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".light%d_id", i);
 			int id = (int) json_number_value(json_object_get(options, buff));
@@ -535,7 +540,7 @@ static void init_options() {
 			}
 		}
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < MOTOR_NUM; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
 			int id = (int) json_number_value(json_object_get(options, buff));
@@ -571,6 +576,12 @@ int main(int argc, char *argv[]) {
 
 	//init options
 	init_options();
+
+	{//i2c
+		char buff[256];
+		sprintf(buff, "/dev/i2c-%d", i);
+		setDeviceFilePath();
+	}
 
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
