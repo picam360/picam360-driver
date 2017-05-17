@@ -571,6 +571,9 @@ static void init_options() {
 			sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
 			lg_camera_offset[i].w = (int) json_number_value(
 					json_object_get(options, buff));
+			if (lg_camera_offset[i].w == 0) {
+				lg_camera_offset[i].w = 0.8;
+			}
 		}
 
 		json_decref(options);
