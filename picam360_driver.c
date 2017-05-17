@@ -182,7 +182,7 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
 				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
 	}
-	if (cam_num <= 0 && cam_num < CAMERA_NUM) {
+	if (cam_num >= 0 && cam_num < CAMERA_NUM) {
 		xmp_len += sprintf(buff + xmp_len,
 				"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
 				lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y,
@@ -560,16 +560,16 @@ static void init_options() {
 		for (int i = 0; i < CAMERA_NUM; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_x", i);
-			lg_camera_offset[i].x = (int) json_number_value(
+			lg_camera_offset[i].x = json_number_value(
 					json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_y", i);
-			lg_camera_offset[i].y = (int) json_number_value(
+			lg_camera_offset[i].y = json_number_value(
 					json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_yaw", i);
-			lg_camera_offset[i].z = (int) json_number_value(
+			lg_camera_offset[i].z = json_number_value(
 					json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
-			lg_camera_offset[i].w = (int) json_number_value(
+			lg_camera_offset[i].w = json_number_value(
 					json_object_get(options, buff));
 			if (lg_camera_offset[i].w == 0) {
 				lg_camera_offset[i].w = 0.8;
