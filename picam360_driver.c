@@ -63,7 +63,7 @@ static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
 
 static int lg_light_value[LIGHT_NUM] = { 0, 0 };
 static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
-static float lg_dir[4] = { -1, 1, -1, 1 };
+static float lg_motor_dir[4] = { -1, 1, -1, 1 };
 
 #define MAX_DELAY_COUNT 256
 static float lg_video_delay = 0;
@@ -361,8 +361,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[0]) {
 			lg_motor_value[0] = value;
 
-			value = lg_dir[0] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_dir[0] * value);
+			value = lg_motor_dir[0] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_motor_dir[0] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], value);
 			write(fd, cmd, len);
 		}
@@ -378,8 +378,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[1]) {
 			lg_motor_value[1] = value;
 
-			value = lg_dir[1] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_dir[1] * value);
+			value = lg_motor_dir[1] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_motor_dir[1] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], value);
 			write(fd, cmd, len);
 		}
@@ -395,8 +395,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[2]) {
 			lg_motor_value[2] = value;
 
-			value = lg_dir[2] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_dir[2] * value);
+			value = lg_motor_dir[2] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_motor_dir[2] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], value);
 			write(fd, cmd, len);
 		}
@@ -412,8 +412,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[3]) {
 			lg_motor_value[3] = value;
 
-			value = lg_dir[3] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_dir[3] * value);
+			value = lg_motor_dir[3] * (value / 100) * MOTOR_RANGE
+					+ MOTOR_BASE(lg_motor_dir[3] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], value);
 			write(fd, cmd, len);
 		}
@@ -550,10 +550,16 @@ static void init_options() {
 
 		for (int i = 0; i < MOTOR_NUM; i++) {
 			char buff[256];
+			int value;
 			sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
-			int id = (int) json_number_value(json_object_get(options, buff));
-			if (id != 0) {
-				lg_motor_id[i] = id;
+			value = (int) json_number_value(json_object_get(options, buff));
+			if (value != 0) {
+				lg_motor_id[i] = value;
+			}
+			sprintf(buff, PLUGIN_NAME ".motor%d_dir", i);
+			value = (int) json_number_value(json_object_get(options, buff));
+			if (value != 0) {
+				lg_motor_dir[i] = value;
 			}
 		}
 
