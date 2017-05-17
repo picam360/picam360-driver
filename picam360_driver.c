@@ -184,7 +184,7 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	}
 	if (cam_num <= 0 && cam_num < CAMERA_NUM) {
 		xmp_len += sprintf(buff + xmp_len,
-				"<camera_offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
+				"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
 				lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y,
 				lg_camera_offset[cam_num].z, lg_camera_offset[cam_num].w);
 	}
