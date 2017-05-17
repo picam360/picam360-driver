@@ -626,7 +626,7 @@ static void save_options() {
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].w));
 	}
 
-	json_dump_file(options, CONFIG_FILE, 0);
+	json_dump_file(options, CONFIG_FILE, JSON_INDENT(4));
 
 	json_decref(options);
 }
