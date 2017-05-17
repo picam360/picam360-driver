@@ -591,12 +591,39 @@ static void save_options() {
 
 	json_object_set_new(options, "skip_frame", json_real(lg_skip_frame));
 	json_object_set_new(options, "video_delay", json_real(lg_video_delay));
+	json_object_set_new(options, "i2c_ch", json_real(lg_i2c_ch));
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_min[i]));
 		sprintf(buff, PLUGIN_NAME ".compass_max_%d", i);
 		json_object_set_new(options, buff, json_real(lg_compass_max[i]));
+	}
+
+	for (int i = 0; i < LIGHT_NUM; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".light%d_id", i);
+		json_object_set_new(options, buff, json_real(lg_light_id[i]));
+	}
+
+	for (int i = 0; i < MOTOR_NUM; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".motor%d_id", i);
+		json_object_set_new(options, buff, json_real(lg_motor_id[i]));
+		sprintf(buff, PLUGIN_NAME ".motor%d_dir", i);
+		json_object_set_new(options, buff, json_real(lg_motor_dir[i]));
+	}
+
+	for (int i = 0; i < CAMERA_NUM; i++) {
+		char buff[256];
+		sprintf(buff, PLUGIN_NAME ".cam%d_offset_x", i);
+		json_object_set_new(options, buff, json_real(lg_camera_offset[i].x));
+		sprintf(buff, PLUGIN_NAME ".cam%d_offset_y", i);
+		json_object_set_new(options, buff, json_real(lg_camera_offset[i].y));
+		sprintf(buff, PLUGIN_NAME ".cam%d_offset_yaw", i);
+		json_object_set_new(options, buff, json_real(lg_camera_offset[i].z));
+		sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
+		json_object_set_new(options, buff, json_real(lg_camera_offset[i].w));
 	}
 
 	json_dump_file(options, CONFIG_FILE, 0);
