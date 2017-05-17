@@ -29,6 +29,10 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define CAMERA_NUM 2
+#define LIGHT_NUM 2
+#define MOTOR_NUM 4
+
 #define CONFIG_FILE "config.json"
 #define PLUGIN_NAME "picam360_driver"
 
@@ -47,14 +51,13 @@ static float lg_north = 0;
 static int lg_north_count = 0;
 
 static int lg_i2c_ch = 1;
+static VECTOR4D_T lg_camera_offset[CAMERA_NUM] = { };
 
 #define MOTOR_CENTER 0.0737
 #define MOTOR_MERGIN 0.0013
 #define MOTOR_RANGE 0.005
 #define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
-#define LIGHT_NUM 2
-#define MOTOR_NUM 4
 static int lg_light_id[LIGHT_NUM] = { 4, 34 };
 static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
 
@@ -129,7 +132,7 @@ static bool init_pwm() {
 	return true;
 }
 
-static int xmp(char *buff, int buff_len) {
+static int xmp(char *buff, int buff_len, int cam_num) {
 	int xmp_len = 0;
 
 	static VECTOR4D_T quat = { };
@@ -178,6 +181,12 @@ static int xmp(char *buff, int buff_len) {
 		xmp_len += sprintf(buff + xmp_len,
 				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
 				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
+	}
+	if (cam_num <= 0 && cam_num < CAMERA_NUM) {
+		xmp_len += sprintf(buff + xmp_len,
+				"<camera_offset x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />",
+				lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y,
+				lg_camera_offset[cam_num].z, lg_camera_offset[cam_num].w);
 	}
 	xmp_len += sprintf(buff + xmp_len, "<ack_command_id v=\"%d\" />",
 			lg_ack_command_id);
@@ -295,7 +304,7 @@ static void *transmit_thread_func(void* arg) {
 			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
-			xmp_len = xmp(buff, buff_size);
+			xmp_len = xmp(buff, buff_size, -1);
 			rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
 		}
 		usleep(10 * 1000); //less than 100Hz
@@ -546,6 +555,22 @@ static void init_options() {
 			if (id != 0) {
 				lg_motor_id[i] = id;
 			}
+		}
+
+		for (int i = 0; i < CAMERA_NUM; i++) {
+			char buff[256];
+			sprintf(buff, PLUGIN_NAME ".camera%d_offset_x", i);
+			lg_camera_offset[i].x = (int) json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".camera%d_offset_y", i);
+			lg_camera_offset[i].y = (int) json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".camera%d_offset_z", i);
+			lg_camera_offset[i].z = (int) json_number_value(
+					json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".camera%d_offset_w", i);
+			lg_camera_offset[i].w = (int) json_number_value(
+					json_object_get(options, buff));
 		}
 
 		json_decref(options);

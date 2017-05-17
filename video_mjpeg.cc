@@ -262,7 +262,7 @@ static void *camx_thread_func(void* arg) {
 					packet->data[0] = 0xFF;
 					packet->data[1] = 0xD8; //soi marker
 					int xmp_len = lg_video_mjpeg_xmp_callback(packet->data + 2,
-					RTP_MAXPAYLOADSIZE - 2);
+					RTP_MAXPAYLOADSIZE - 2, send_frame_arg->cam_num);
 					if (packet->len + xmp_len > RTP_MAXPAYLOADSIZE) { // split packet
 						packet->len = 2 + xmp_len;
 
@@ -356,8 +356,7 @@ int video_mjpeg_get_frameskip(int cam_num) {
 	return lg_send_frame_arg[cam_num]->frameskip;
 }
 
-void video_mjpeg_set_skip_frame(int cam_num, int value)
-{
+void video_mjpeg_set_skip_frame(int cam_num, int value) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (!lg_send_frame_arg[cam_num]) {
 		return;
