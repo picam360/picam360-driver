@@ -589,9 +589,9 @@ static void init_options() {
 static void save_options() {
 	json_t *options = json_object();
 
-	json_object_set_new(options, "skip_frame", json_real(lg_skip_frame));
-	json_object_set_new(options, "video_delay", json_real(lg_video_delay));
-	json_object_set_new(options, "i2c_ch", json_real(lg_i2c_ch));
+	json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
+	json_object_set_new(options, PLUGIN_NAME ".video_delay", json_real(lg_video_delay));
+	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
 		sprintf(buff, PLUGIN_NAME ".compass_min_%d", i);
