@@ -102,8 +102,33 @@ static void command_handler(const char *_buff) {
 			lg_video_delay = MAX(MIN(value,MAX_DELAY_COUNT), 0);
 			printf("set_video_delay : completed\n");
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_x", sizeof(buff))
+			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			sscanf(param, "%d=%f", &cam_num, &value);
+			if (cam_num >= 0 && cam_num < CAMERA_NUM) {
+				lg_camera_offset[cam_num].x += value;
+			}
+			printf("add_camera_offset_x : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_y", sizeof(buff))
+			== 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			int cam_num = 0;
+			float value = 0;
+			sscanf(param, "%d=%f", &cam_num, &value);
+			if (cam_num >= 0 && cam_num < CAMERA_NUM) {
+				lg_camera_offset[cam_num].y += value;
+			}
+			printf("add_camera_offset_y : completed\n");
+		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".save", sizeof(buff)) == 0) {
 		save_options();
+		printf("save : completed\n");
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
