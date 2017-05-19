@@ -53,10 +53,10 @@ static int lg_north_count = 0;
 static int lg_i2c_ch = 1;
 static VECTOR4D_T lg_camera_offset[CAMERA_NUM] = { };
 
-#define MOTOR_CENTER 0.0737
-#define MOTOR_MERGIN 0.0013
-#define MOTOR_RANGE 0.005
-#define MOTOR_BASE(value) MOTOR_CENTER + MOTOR_MERGIN * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
+static float lg_motor_center = 0.0737;
+static float lg_motor_margin = 0.0013;
+static float lg_motor_range = 0.005;
+#define MOTOR_BASE(value) lg_motor_center + lg_motor_margin * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
 
 static int lg_light_id[LIGHT_NUM] = { 4, 34 };
 static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
@@ -168,13 +168,13 @@ static bool init_pwm() {
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], MOTOR_CENTER);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], lg_motor_center);
 		write(fd, cmd, len);
 		close(fd);
 	}
@@ -286,7 +286,7 @@ static void *transmit_thread_func(void* arg) {
 					calib[0] * calib[0] + calib[1] * calib[1]
 							+ calib[2] * calib[2]);
 			for (int i = 0; i < 3; i++) {
-				calib[i] /= norm;
+				calib[i] /= (norm == 0 ? 1 : norm);
 			}
 			//convert from mpu coodinate to opengl coodinate
 			lg_compass.ary[0] = calib[1];
@@ -410,8 +410,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[0]) {
 			lg_motor_value[0] = value;
 
-			value = lg_motor_dir[0] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_motor_dir[0] * value);
+			value = lg_motor_dir[0] * (value / 100)
+					* lg_motor_range+ MOTOR_BASE(lg_motor_dir[0] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], value);
 			write(fd, cmd, len);
 		}
@@ -427,8 +427,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[1]) {
 			lg_motor_value[1] = value;
 
-			value = lg_motor_dir[1] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_motor_dir[1] * value);
+			value = lg_motor_dir[1] * (value / 100)
+					* lg_motor_range+ MOTOR_BASE(lg_motor_dir[1] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], value);
 			write(fd, cmd, len);
 		}
@@ -444,8 +444,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[2]) {
 			lg_motor_value[2] = value;
 
-			value = lg_motor_dir[2] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_motor_dir[2] * value);
+			value = lg_motor_dir[2] * (value / 100)
+					* lg_motor_range+ MOTOR_BASE(lg_motor_dir[2] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], value);
 			write(fd, cmd, len);
 		}
@@ -461,8 +461,8 @@ static void parse_xml(char *xml) {
 		if (value != lg_motor_value[3]) {
 			lg_motor_value[3] = value;
 
-			value = lg_motor_dir[3] * (value / 100) * MOTOR_RANGE
-					+ MOTOR_BASE(lg_motor_dir[3] * value);
+			value = lg_motor_dir[3] * (value / 100)
+					* lg_motor_range+ MOTOR_BASE(lg_motor_dir[3] * value);
 			len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], value);
 			write(fd, cmd, len);
 		}
@@ -611,6 +611,24 @@ static void init_options() {
 				lg_motor_dir[i] = value;
 			}
 		}
+		{
+			float value;
+			value = json_number_value(
+					json_object_get(options, PLUGIN_NAME ".motor_center"));
+			if (value != 0) {
+				lg_motor_center = value;
+			}
+			value = json_number_value(
+					json_object_get(options, PLUGIN_NAME ".motor_margin"));
+			if (value != 0) {
+				lg_motor_margin = value;
+			}
+			value = json_number_value(
+					json_object_get(options, PLUGIN_NAME ".motor_range"));
+			if (value != 0) {
+				lg_motor_range = value;
+			}
+		}
 
 		for (int i = 0; i < CAMERA_NUM; i++) {
 			char buff[256];
@@ -638,8 +656,10 @@ static void init_options() {
 static void save_options() {
 	json_t *options = json_object();
 
-	json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
-	json_object_set_new(options, PLUGIN_NAME ".video_delay", json_real(lg_video_delay));
+	json_object_set_new(options, PLUGIN_NAME ".skip_frame",
+			json_real(lg_skip_frame));
+	json_object_set_new(options, PLUGIN_NAME ".video_delay",
+			json_real(lg_video_delay));
 	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
@@ -661,6 +681,15 @@ static void save_options() {
 		json_object_set_new(options, buff, json_real(lg_motor_id[i]));
 		sprintf(buff, PLUGIN_NAME ".motor%d_dir", i);
 		json_object_set_new(options, buff, json_real(lg_motor_dir[i]));
+	}
+
+	{
+		json_object_set_new(options, PLUGIN_NAME ".motor_center",
+				json_real(lg_motor_center));
+		json_object_set_new(options, PLUGIN_NAME ".motor_margin",
+				json_real(lg_motor_margin));
+		json_object_set_new(options, PLUGIN_NAME ".motor_range",
+				json_real(lg_motor_range));
 	}
 
 	for (int i = 0; i < CAMERA_NUM; i++) {
