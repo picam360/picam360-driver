@@ -14,6 +14,12 @@ USBCAM=false
 
 sudo killall picam360-driver.bin
 
+if [ -e cmd ]; then
+	rm cmd
+fi
+mkfifo cmd
+chmod 0666 cmd
+
 if [ -e cam0 ]; then
 	rm cam0
 fi
