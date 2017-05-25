@@ -36,7 +36,7 @@ extern "C" {
 
 //#define USE_SOCKET
 
-#ifdef defined USE_JRTP
+#if defined USE_JRTP
 #include "rtpsession.h"
 #include "rtpudpv4transmitter.h"
 #include "rtpipv4address.h"
@@ -238,7 +238,7 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			delete pack;
 		}
 #endif
-		if(bandwidth_limit > 0)
+		if(lg_bandwidth_limit > 0)
 		{ //limit bandwidth
 			struct timeval time2 = { };
 			gettimeofday(&time2, NULL);
