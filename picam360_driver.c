@@ -717,7 +717,7 @@ int main(int argc, char *argv[]) {
 
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
-	init_rtp(9004, "192.168.4.2", 9002);
+	init_rtp(9004, "192.168.4.2", 9002, 0);
 
 	set_video_mjpeg_xmp_callback(xmp);
 	init_video_mjpeg(0, NULL);
