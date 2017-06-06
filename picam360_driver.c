@@ -76,7 +76,7 @@ static int lg_ack_command_id = 0;
 static void init_options();
 static void save_options();
 
-static void command_handler(const char *_buff) {
+static int command_handler(const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
 	char *cmd;
@@ -144,9 +144,16 @@ static void command_handler(const char *_buff) {
 		if (param != NULL) {
 			int cam_num = 0;
 			float value = 0;
-			sscanf(param, "%d=%f", &cam_num, &value);
-			if (cam_num >= 0 && cam_num < CAMERA_NUM) {
-				lg_camera_offset[cam_num].w += value;
+			if (param[0] == '*') {
+				sscanf(param, "*=%f", &value);
+				for (int i = 0; i < CAMERA_NUM; i++) {
+					lg_camera_offset[i].w += value;
+				}
+			} else {
+				sscanf(param, "%d=%f", &cam_num, &value);
+				if (cam_num >= 0 && cam_num < CAMERA_NUM) {
+					lg_camera_offset[cam_num].w += value;
+				}
 			}
 			printf("add_camera_horizon_r : completed\n");
 		}
@@ -156,6 +163,7 @@ static void command_handler(const char *_buff) {
 	} else {
 		printf(":unknown command : %s\n", buff);
 	}
+	return 0;
 }
 
 static bool init_pwm() {
