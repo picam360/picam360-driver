@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include <wchar.h>
 #include <jansson.h>//json parser
 #include "quaternion.h"
 
@@ -17,16 +18,13 @@ typedef struct _MPU_T {
 	void *user_data;
 } MPU_T;
 
-typedef struct _PLUGIN_HOST_T {
-	VECTOR4D_T (*get_quaternion)();
-	VECTOR4D_T (*get_compass)();
-	float (*get_temperature)();
-	float (*get_north)();
-
-	void (*send_command)(const char *cmd);
-	void (*send_event)(uint32_t node_id, uint32_t event_id);
-	void (*add_mpu)(MPU_T *mpu);
-} PLUGIN_HOST_T;
+typedef struct _STATUS_T {
+	char name[64];
+	void (*get_value)(void *user_data, char *buff, int buff_len);
+	void (*set_value)(void *user_data, const char *value);
+	void (*release)(void *user_data);
+	void *user_data;
+} STATUS_T;
 
 typedef struct _PLUGIN_T {
 	char name[64];
@@ -39,6 +37,20 @@ typedef struct _PLUGIN_T {
 	void *user_data;
 	uint32_t node_id;
 } PLUGIN_T;
+
+typedef struct _PLUGIN_HOST_T {
+	VECTOR4D_T (*get_quaternion)();
+	VECTOR4D_T (*get_compass)();
+	float (*get_temperature)();
+	float (*get_north)();
+
+	void (*send_command)(const char *cmd);
+	void (*send_event)(uint32_t node_id, uint32_t event_id);
+	void (*add_mpu)(MPU_T *mpu);
+	void (*add_status)(STATUS_T *status);
+	void (*add_watch)(STATUS_T *status);
+	void (*add_plugin)(PLUGIN_T *plugin);
+} PLUGIN_HOST_T;
 
 typedef void (*CREATE_PLUGIN)(PLUGIN_HOST_T *plugin_host, PLUGIN_T **plugin);
 

@@ -13,21 +13,17 @@
 #include <math.h>
 #include <limits.h>
 #include <jansson.h> //json parser
+#include <dlfcn.h>
 
 #include <editline/readline.h>
 #include <editline/history.h>
 
 #include "picam360_driver.h"
-#include "MotionSensor.h"
 
 #include "rtp.h"
 #include "video_mjpeg.h"
 #include "quaternion.h"
 #include "manual_mpu.h"
-
-//these plugin should be got out to shared object
-#include "plugins/rov_driver/rov_driver.h"
-#include "plugins/mpu9250/mpu9250.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -44,7 +40,6 @@ static PICAM360DRIVER_T _state, *state = &_state;
 
 #define PT_STATUS 100
 #define PT_CMD 101
-int lg_cmd_fd = -1;
 
 static VECTOR4D_T lg_camera_offset[CAMERA_NUM] = { };
 
@@ -174,15 +169,8 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 			quat.y, quat.z, quat.w);
 	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
 			compass.x, compass.y, compass.z);
-//	if (lg_is_compass_calib) {
-//		xmp_len += sprintf(buff + xmp_len,
-//				"<compass_min x=\"%f\" y=\"%f\" z=\"%f\" />", lg_compass_min[0],
-//				lg_compass_min[1], lg_compass_min[2]);
-//		xmp_len += sprintf(buff + xmp_len,
-//				"<compass_max x=\"%f\" y=\"%f\" z=\"%f\" />", lg_compass_max[0],
-//				lg_compass_max[1], lg_compass_max[2]);
-//	}
-	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", state->plugin_host.get_temperature());
+	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />",
+			state->plugin_host.get_temperature());
 	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
 			rtp_get_bandwidth());
 	for (int i = 0; i < 2; i++) {
@@ -211,9 +199,9 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 
 static void *transmit_thread_func(void* arg) {
 	int count = 0;
-	int xmp_len = 0;
-	int buff_size = RTP_MAXPAYLOADSIZE;
-	char buff[RTP_MAXPAYLOADSIZE];
+	//int xmp_len = 0;
+	//int buff_size = RTP_MAXPAYLOADSIZE;
+	//char buff[RTP_MAXPAYLOADSIZE];
 	while (1) {
 		count++;
 		{
@@ -222,197 +210,10 @@ static void *transmit_thread_func(void* arg) {
 			lg_video_delay_cur++;
 		}
 		if ((count % 100) == 0) {
-			xmp_len = xmp(buff, buff_size, -1);
-			rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
+			//rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
 		}
 		usleep(10 * 1000); //less than 100Hz
 	}
-	return NULL;
-}
-//
-static void parse_xml(char *xml) {
-//	int fd = open("/dev/pi-blaster", O_WRONLY);
-//	if (fd < 0) {
-//		return;
-//	}
-//	char *value_str;
-//
-//	value_str = strstr(xml, "light0_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "light0_value=\"%f\"", &value);
-//		value = MIN(MAX(value, 0), 100);
-//		if (value != lg_light_value[0]) {
-//			lg_light_value[0] = value;
-//
-//			value = pow(value / 100, 3);
-//			len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "light1_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "light1_value=\"%f\"", &value);
-//		value = MIN(MAX(value, 0), 100);
-//		if (value != lg_light_value[1]) {
-//			lg_light_value[1] = value;
-//
-//			value = pow(value / 100, 3);
-//			len = sprintf(cmd, "%d=%f\n", lg_light_id[1], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "motor0_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "motor0_value=\"%f\"", &value);
-//		value = MIN(MAX(value, -100), 100);
-//		if (value != lg_motor_value[0]) {
-//			lg_motor_value[0] = value;
-//
-//			value = lg_motor_dir[0] * (value / 100) * lg_motor_range
-//					+ MOTOR_BASE(lg_motor_dir[0] * value);
-//			len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "motor1_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "motor1_value=\"%f\"", &value);
-//		value = MIN(MAX(value, -100), 100);
-//		if (value != lg_motor_value[1]) {
-//			lg_motor_value[1] = value;
-//
-//			value = lg_motor_dir[1] * (value / 100) * lg_motor_range
-//					+ MOTOR_BASE(lg_motor_dir[1] * value);
-//			len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "motor2_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "motor2_value=\"%f\"", &value);
-//		value = MIN(MAX(value, -100), 100);
-//		if (value != lg_motor_value[2]) {
-//			lg_motor_value[2] = value;
-//
-//			value = lg_motor_dir[2] * (value / 100) * lg_motor_range
-//					+ MOTOR_BASE(lg_motor_dir[2] * value);
-//			len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "motor3_value=");
-//	if (value_str) {
-//		char cmd[256];
-//		float value;
-//		int len;
-//		sscanf(value_str, "motor3_value=\"%f\"", &value);
-//		value = MIN(MAX(value, -100), 100);
-//		if (value != lg_motor_value[3]) {
-//			lg_motor_value[3] = value;
-//
-//			value = lg_motor_dir[3] * (value / 100) * lg_motor_range
-//					+ MOTOR_BASE(lg_motor_dir[3] * value);
-//			len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], value);
-//			write(fd, cmd, len);
-//		}
-//	}
-//
-//	value_str = strstr(xml, "command_id=");
-//	if (value_str) {
-//		int command_id;
-//		sscanf(value_str, "command_id=\"%d\"", &command_id);
-//		if (command_id != lg_ack_command_id) {
-//			lg_ack_command_id = command_id;
-//
-//			value_str = strstr(xml, "command=");
-//			if (value_str) {
-//				char command[1024];
-//				sscanf(value_str, "command=\"%[^\"]\"", command);
-//				_command_handler(command);
-//			}
-//		}
-//	}
-//
-//	close(fd);
-}
-
-static void *recieve_thread_func(void* arg) {
-	int buff_size = 4096;
-	unsigned char *buff = malloc(buff_size);
-	int data_len = 0;
-	int marker = 0;
-	int fd = open("cmd", O_RDONLY);
-	if (fd < 0) {
-		return NULL;
-	}
-	bool xmp = false;
-	int buff_xmp_size = 4096;
-	char *buff_xmp = malloc(buff_xmp_size);
-	int xmp_len = 0;
-	int xmp_idx = 0;
-
-	while (1) {
-		data_len = read(fd, buff, buff_size);
-		for (int i = 0; i < data_len; i++) {
-			if (xmp) {
-				if (xmp_idx == 0) {
-					xmp_len = ((unsigned char*) buff)[i] << 8;
-				} else if (xmp_idx == 1) {
-					xmp_len += ((unsigned char*) buff)[i];
-					if (xmp_len > buff_xmp_size) {
-						free(buff_xmp);
-						buff_xmp_size = xmp_len;
-						buff_xmp = malloc(buff_xmp_size);
-					}
-					buff_xmp[0] = (xmp_len >> 8) & 0xFF;
-					buff_xmp[1] = (xmp_len) & 0xFF;
-				} else {
-					buff_xmp[xmp_idx] = buff[i];
-				}
-				xmp_idx++;
-				if (xmp_idx >= xmp_len) {
-					char *xml = buff_xmp + strlen(buff_xmp) + 1;
-
-					parse_xml(xml);
-					xmp = false;
-				}
-			}
-			if (marker) {
-				marker = 0;
-				if (buff[i] == 0xE1) { //APP1
-					xmp = true;
-					xmp_len = 0;
-					xmp_idx = 0;
-				}
-			} else if (buff[i] == 0xFF) {
-				marker = 1;
-			}
-		}
-	}
-
-	free(buff);
-	free(buff_xmp);
-
 	return NULL;
 }
 
@@ -421,19 +222,21 @@ static int rtp_callback(unsigned char *data, int data_len, int pt,
 	if (data_len <= 0) {
 		return -1;
 	}
-	int fd = -1;
+	static unsigned int last_seq_num = 0;
+	if (seq_num != last_seq_num + 1) {
+		printf("packet lost : from %d to %d\n", last_seq_num, seq_num);
+	}
+	last_seq_num = seq_num;
+
 	if (pt == PT_CMD) {
-		if (lg_cmd_fd < 0) {
-			lg_cmd_fd = open("cmd", O_WRONLY | O_NONBLOCK);
-		}
-		fd = lg_cmd_fd;
+		state->plugin_host.send_command((char*) data);
 	}
-	if (fd < 0) {
-		return -1;
-	}
-	write(fd, data, data_len);
 	return 0;
 }
+
+
+///////////////////////////////////////////
+#if (1) //plugin host methods
 
 static void init_options() {
 	json_error_t error;
@@ -462,6 +265,48 @@ static void init_options() {
 					json_object_get(options, buff));
 			if (lg_camera_offset[i].w == 0) {
 				lg_camera_offset[i].w = 0.8;
+			}
+		}
+		{
+			json_t *plugin_paths = json_object_get(options, "plugin_paths");
+			if (json_is_array(plugin_paths)) {
+				int size = json_array_size(plugin_paths);
+				state->plugin_paths = (char**) malloc(
+						sizeof(char*) * (size + 1));
+				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
+
+				for (int i = 0; i < size; i++) {
+					json_t *value = json_array_get(plugin_paths, i);
+					int len = json_string_length(value);
+					state->plugin_paths[i] = (char*) malloc(
+							sizeof(char) * (len + 1));
+					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
+					strncpy(state->plugin_paths[i], json_string_value(value),
+							len);
+					if (len > 0) {
+						void *handle = dlopen(state->plugin_paths[i],
+								RTLD_LAZY);
+						if (!handle) {
+							fprintf(stderr, "%s\n", dlerror());
+							continue;
+						}
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(
+								handle, "create_plugin");
+						if (!create_plugin) {
+							fprintf(stderr, "%s\n", dlerror());
+							dlclose(handle);
+							continue;
+						}
+						PLUGIN_T *plugin = NULL;
+						create_plugin(&state->plugin_host, &plugin);
+						if (!plugin) {
+							fprintf(stderr, "%s\n", "create_plugin fail.");
+							dlclose(handle);
+							continue;
+						}
+						state->plugin_host.add_plugin(plugin);
+					}
+				}
 			}
 		}
 
@@ -591,6 +436,90 @@ static void add_mpu(MPU_T *mpu) {
 	}
 }
 
+static void add_status(STATUS_T *status) {
+	if (state->statuses == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->statuses = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
+		memset(state->statuses, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
+		state->statuses[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
+	for (int i = 0; state->statuses[i] != (void*) -1; i++) {
+		if (state->statuses[i] == NULL) {
+			state->statuses[i] = status;
+			return;
+		}
+		if (state->statuses[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				fprintf(stderr, "error on add_mpu\n");
+				return;
+			}
+			STATUS_T **current = state->statuses;
+			state->statuses = malloc(sizeof(STATUS_T*) * space);
+			memcpy(state->statuses, current, sizeof(STATUS_T*) * (i + 1));
+			state->statuses[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
+
+static void add_watch(STATUS_T *watch) {
+	if (state->watches == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->watches = malloc(sizeof(STATUS_T*) * INITIAL_SPACE);
+		memset(state->watches, 0, sizeof(STATUS_T*) * INITIAL_SPACE);
+		state->watches[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
+	for (int i = 0; state->watches[i] != (void*) -1; i++) {
+		if (state->watches[i] == NULL) {
+			state->watches[i] = watch;
+			return;
+		}
+		if (state->watches[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				fprintf(stderr, "error on add_mpu\n");
+				return;
+			}
+			STATUS_T **current = state->watches;
+			state->watches = malloc(sizeof(STATUS_T*) * space);
+			memcpy(state->watches, current, sizeof(STATUS_T*) * (i + 1));
+			state->watches[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
+
+static void add_plugin(PLUGIN_T *plugin) {
+	if (state->plugins == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
+		state->plugins[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
+	for (int i = 0; state->plugins[i] != (void*) -1; i++) {
+		if (state->plugins[i] == NULL) {
+			state->plugins[i] = plugin;
+			return;
+		}
+		if (state->plugins[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				fprintf(stderr, "error on add_mpu\n");
+				return;
+			}
+			PLUGIN_T **current = state->plugins;
+			state->plugins = malloc(sizeof(PLUGIN_T*) * space);
+			memcpy(state->plugins, current, sizeof(PLUGIN_T*) * (i + 1));
+			state->plugins[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
+
 static void init_plugins(PICAM360DRIVER_T *state) {
 	{ //init host
 		state->plugin_host.get_quaternion = get_quaternion;
@@ -601,6 +530,9 @@ static void init_plugins(PICAM360DRIVER_T *state) {
 		state->plugin_host.send_command = send_command;
 		state->plugin_host.send_event = send_event;
 		state->plugin_host.add_mpu = add_mpu;
+		state->plugin_host.add_status = add_status;
+		state->plugin_host.add_watch = add_watch;
+		state->plugin_host.add_plugin = add_plugin;
 	}
 
 	{
@@ -608,21 +540,9 @@ static void init_plugins(PICAM360DRIVER_T *state) {
 		create_manual_mpu(&mpu);
 		state->plugin_host.add_mpu(mpu);
 	}
-
-	const int INITIAL_SPACE = 16;
-	CREATE_PLUGIN create_plugin_funcs[] = { //
-			create_rov_driver, //
-					create_mpu9250, //
-			};
-	int num_of_plugins = sizeof(create_plugin_funcs) / sizeof(CREATE_PLUGIN);
-	state->plugins = malloc(sizeof(PLUGIN_T*) * INITIAL_SPACE);
-	memset(state->plugins, 0, sizeof(PLUGIN_T*) * INITIAL_SPACE);
-	for (int i = 0; i < num_of_plugins; i++) {
-		create_plugin_funcs[i](&state->plugin_host, &state->plugins[i]);
-		state->plugins[i]->node_id = i + 100;
-	}
-	state->plugins[INITIAL_SPACE - 1] = (void*) -1;
 }
+
+#endif //plugin block
 
 int command_handler() {
 	int ret = 0;
@@ -664,13 +584,14 @@ static void *readline_thread_func(void* arg) {
 	char *ptr;
 	using_history();
 	read_history(PICAM360_HISTORY_FILE);
-	while (ptr = readline("picam360-driver>")) {
+	while ((ptr = readline("picam360-driver>")) != NULL) {
 		add_history(ptr);
 		state->plugin_host.send_command(ptr);
 		free(ptr);
 
 		write_history(PICAM360_HISTORY_FILE);
 	}
+	return NULL;
 }
 
 //------------------------------------------------------------------------------
@@ -730,9 +651,6 @@ int main(int argc, char *argv[]) {
 
 	pthread_t transmit_thread;
 	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
-
-	pthread_t recieve_thread;
-	pthread_create(&recieve_thread, NULL, recieve_thread_func, (void*) NULL);
 
 	//readline
 	pthread_t readline_thread;
