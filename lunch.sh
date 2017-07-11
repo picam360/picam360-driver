@@ -78,4 +78,4 @@ fi
 sleep 3
 
 # driver
-./picam360-driver.bin
+./picam360-driver.bin -v mpu9250

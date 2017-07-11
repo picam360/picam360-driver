@@ -43,8 +43,8 @@ static float lg_motor_range = 0.005;
 static int lg_light_id[LIGHT_NUM] = { 4, 34 };
 static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
 
-static int lg_light_value[LIGHT_NUM] = { 0, 0 };
-static int lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
+static float lg_light_value[LIGHT_NUM] = { 0, 0 };
+static float lg_motor_value[MOTOR_NUM] = { 0, 0, 0, 0 };
 static float lg_motor_dir[4] = { -1, 1, -1, 1 };
 
 static float lg_light_strength = 0; //0 to 100
@@ -72,6 +72,8 @@ static bool init_pwm() {
 	if (fd > 0) {
 		char cmd[256];
 		int len;
+		len = sprintf(cmd, "sync=off\n");
+		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
@@ -83,6 +85,8 @@ static bool init_pwm() {
 		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], lg_motor_center);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], lg_motor_center);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "sync=on\n");
 		write(fd, cmd, len);
 		close(fd);
 	}
@@ -323,6 +327,23 @@ void *pid_thread_func(void* arg) {
 	} // end of while
 }
 
+static bool is_init = false;
+static void init() {
+	if (is_init) {
+		return;
+	}
+	is_init = true;
+
+	bool succeeded = init_pwm();
+	if (!succeeded) {
+		perror("An error happen in init_pwm().");
+		exit(-1);
+	}
+
+	pthread_t pid_thread;
+	pthread_create(&pid_thread, NULL, pid_thread_func, (void*) NULL);
+}
+
 static int command_handler(void *user_data, const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
@@ -397,7 +418,6 @@ static int command_handler(void *user_data, const char *_buff) {
 			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float value;
 			int id = 0;
 			float value = 0;
 			sscanf(param, "%d=%f", &id, &value);
@@ -487,6 +507,8 @@ static void init_options(void *user_data, json_t *options) {
 			lg_motor_range = value;
 		}
 	}
+
+	init();//need motor ids
 }
 
 static void save_options(void *user_data, json_t *options) {
@@ -518,23 +540,6 @@ static void save_options(void *user_data, json_t *options) {
 	}
 }
 
-static bool is_init = false;
-static void init() {
-	if (is_init) {
-		return;
-	}
-	is_init = true;
-
-	bool succeeded = init_pwm();
-	if (!succeeded) {
-		perror("An error happen in init_pwm().");
-		exit(-1);
-	}
-
-	pthread_t pid_thread;
-	pthread_create(&pid_thread, NULL, pid_thread_func, (void*) NULL);
-}
-
 #define MAX_INFO_LEN 1024
 static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
@@ -543,7 +548,6 @@ static wchar_t *get_info(void *user_data) {
 }
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
-	init();
 	lg_plugin_host = plugin_host;
 
 	{

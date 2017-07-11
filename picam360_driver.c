@@ -61,6 +61,11 @@ static int _command_handler(const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
+			|| strncmp(cmd, "q", sizeof(buff)) == 0
+			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
+		printf("exit\n");
+		exit(0);
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
 			== 0) {
 		char *param = strtok(NULL, " \n");
@@ -125,7 +130,7 @@ static int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_horizon_r : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".save", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
 		save_options();
 		printf("save : completed\n");
 	} else {
@@ -184,8 +189,6 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 				lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y,
 				lg_camera_offset[cam_num].z, lg_camera_offset[cam_num].w);
 	}
-	xmp_len += sprintf(buff + xmp_len, "<ack_command_id v=\"%d\" />",
-			lg_ack_command_id);
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
 	xmp_len += sprintf(buff + xmp_len, "</x:xmpmeta>");
@@ -197,11 +200,11 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	return xmp_len;
 }
 
+///////////////////////////////////////////////////////
+#if (1) //rtp block
+
 static void *transmit_thread_func(void* arg) {
 	int count = 0;
-	//int xmp_len = 0;
-	//int buff_size = RTP_MAXPAYLOADSIZE;
-	//char buff[RTP_MAXPAYLOADSIZE];
 	while (1) {
 		count++;
 		{
@@ -209,8 +212,28 @@ static void *transmit_thread_func(void* arg) {
 			lg_quaternion_queue[cur] = state->plugin_host.get_quaternion();
 			lg_video_delay_cur++;
 		}
-		if ((count % 100) == 0) {
-			//rtp_sendpacket((unsigned char*) buff, xmp_len, PT_STATUS);
+		if ((count % 10) == 0 && state->statuses) { //less than 10Hz
+			int cur = 0;
+			char statuses[RTP_MAXPAYLOADSIZE];
+			for (int i = 0; state->statuses[i]; i++) {
+				char value[256] = { };
+				state->statuses[i]->get_value(state->statuses[i]->user_data,
+						value, sizeof(value));
+				char buff[256];
+				int len = snprintf(buff, sizeof(buff),
+						"<picam360:status name=\"%s\" value=\"%s\" />",
+						state->statuses[i]->name, value);
+				if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
+					rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+					cur = 0;
+				} else {
+					strncpy(statuses + cur, buff, len);
+					cur += len;
+				}
+			}
+			if (cur != 0) {
+				rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+			}
 		}
 		usleep(10 * 1000); //less than 100Hz
 	}
@@ -229,11 +252,50 @@ static int rtp_callback(unsigned char *data, int data_len, int pt,
 	last_seq_num = seq_num;
 
 	if (pt == PT_CMD) {
-		state->plugin_host.send_command((char*) data);
+		int id;
+		char value[256];
+		int num = sscanf(data,
+				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
+				value);
+		if (num == 2 && id != lg_ack_command_id) {
+			lg_ack_command_id = id;
+			state->plugin_host.send_command(value);
+		}
 	}
 	return 0;
 }
 
+static void status_release(void *user_data) {
+	free(user_data);
+}
+static void status_get_value(void *user_data, char *buff, int buff_len) {
+	//STATUS_T *status = (STATUS_T*) user_data;
+	STATUS_T *status = (STATUS_T*) user_data;
+	if (strcmp(status->name, "ack_command_id") == 0) {
+		snprintf(buff, buff_len, "%d", lg_ack_command_id);
+	}
+}
+static void status_set_value(void *user_data, const char *value) {
+	//STATUS_T *status = (STATUS_T*) user_data;
+}
+
+static void _init_rtp() {
+	init_rtp(9004, "192.168.4.2", 9002, 0);
+	rtp_set_callback((RTP_CALLBACK) rtp_callback);
+
+	{
+		STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+		strcpy(status->name, "ack_command_id");
+		status->get_value = status_get_value;
+		status->set_value = status_set_value;
+		status->release = status_release;
+		status->user_data = status;
+
+		state->plugin_host.add_status(status);
+	}
+}
+
+#endif //rtp block
 
 ///////////////////////////////////////////
 #if (1) //plugin host methods
@@ -341,6 +403,15 @@ static void save_options() {
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].z));
 		sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].w));
+	}
+
+	if (state->plugin_paths) {
+		json_t *plugin_paths = json_array();
+		for (int i = 0; state->plugin_paths[i] != NULL; i++) {
+			json_array_append_new(plugin_paths,
+					json_string(state->plugin_paths[i]));
+		}
+		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
 
 	if (state->plugins) {
@@ -632,9 +703,8 @@ int main(int argc, char *argv[]) {
 	//init options
 	init_options();
 
-	rtp_set_callback((RTP_CALLBACK) rtp_callback);
-
-	init_rtp(9004, "192.168.4.2", 9002, 0);
+	//init rtp
+	_init_rtp();
 
 	//set mpu
 	for (int i = 0; state->mpus[i] != NULL; i++) {
