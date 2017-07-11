@@ -412,6 +412,10 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%f", &value);
 
 			lg_pid_enabled = (value != 0);
+			lg_thrust = 0;
+			memset(lg_pid_value, 0, sizeof(lg_pid_value));
+			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+
 			printf("set_pid_enabled : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
