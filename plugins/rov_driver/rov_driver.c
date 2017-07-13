@@ -345,17 +345,23 @@ static int command_handler(void *user_data, const char *_buff) {
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
-			float v, x, y, z, w;
-			int num = sscanf(param, "%f %f,%f,%f,%f", &v, &x, &y, &z, &w);
+			float v;
+			int num = sscanf(param, "%f", &v);
 
 			if (num == 1) {
 				lg_thrust = v;
-			} else if (num == 5) {
-				lg_thrust = v;
-				lg_target_quaternion.x = x;
-				lg_target_quaternion.y = y;
-				lg_target_quaternion.z = z;
-				lg_target_quaternion.w = w;
+				param = strtok(NULL, " \n");
+				if (param != NULL) {
+					float x, y, z, w;
+					int num = sscanf(param, "%f,%f,%f,%f", &x, &y, &z, &w);
+
+					if (num == 4) {
+						lg_target_quaternion.x = x;
+						lg_target_quaternion.y = y;
+						lg_target_quaternion.z = z;
+						lg_target_quaternion.w = w;
+					}
+				}
 			}
 			printf("set_thrust : completed\n");
 		}
