@@ -176,13 +176,6 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 			compass.x, compass.y, compass.z);
 	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />",
 			state->plugin_host.get_temperature());
-	xmp_len += sprintf(buff + xmp_len, "<bandwidth v=\"%f\" />",
-			rtp_get_bandwidth());
-	for (int i = 0; i < 2; i++) {
-		xmp_len += sprintf(buff + xmp_len,
-				"<video_info id=\"%d\" fps=\"%f\" frameskip=\"%d\" />", i,
-				video_mjpeg_get_fps(i), video_mjpeg_get_frameskip(i));
-	}
 	if (cam_num >= 0 && cam_num < CAMERA_NUM) {
 		xmp_len += sprintf(buff + xmp_len,
 				"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
@@ -254,7 +247,7 @@ static int rtp_callback(unsigned char *data, int data_len, int pt,
 	if (pt == PT_CMD) {
 		int id;
 		char value[256];
-		int num = sscanf(data,
+		int num = sscanf((char*) data,
 				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
 				value);
 		if (num == 2 && id != lg_ack_command_id) {
@@ -265,34 +258,77 @@ static int rtp_callback(unsigned char *data, int data_len, int pt,
 	return 0;
 }
 
+#if (1) //status block
+
+#define STATUS_VAR(name) lg_status_ ## name
+#define STATUS_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_status(STATUS_VAR(name));
+
+static STATUS_T *STATUS_VAR(ack_command_id);
+static STATUS_T *STATUS_VAR(quaternion);
+static STATUS_T *STATUS_VAR(compass);
+static STATUS_T *STATUS_VAR(temperature);
+static STATUS_T *STATUS_VAR(bandwidth);
+static STATUS_T *STATUS_VAR(cam_fps);
+static STATUS_T *STATUS_VAR(cam_frameskip);
+
 static void status_release(void *user_data) {
 	free(user_data);
 }
 static void status_get_value(void *user_data, char *buff, int buff_len) {
-	//STATUS_T *status = (STATUS_T*) user_data;
 	STATUS_T *status = (STATUS_T*) user_data;
-	if (strcmp(status->name, "ack_command_id") == 0) {
+	if (status == STATUS_VAR(ack_command_id)) {
 		snprintf(buff, buff_len, "%d", lg_ack_command_id);
+	} else if (status == STATUS_VAR(quaternion)) {
+		VECTOR4D_T vec = state->plugin_host.get_quaternion();
+		snprintf(buff, buff_len, "%f,%f,%f,%f", vec.x, vec.y, vec.z, vec.w);
+	} else if (status == STATUS_VAR(compass)) {
+		VECTOR4D_T vec = state->plugin_host.get_compass();
+		snprintf(buff, buff_len, "%f,%f,%f,%f", vec.x, vec.y, vec.z, vec.w);
+	} else if (status == STATUS_VAR(temperature)) {
+		snprintf(buff, buff_len, "%f", state->plugin_host.get_temperature());
+	} else if (status == STATUS_VAR(bandwidth)) {
+		snprintf(buff, buff_len, "%f", rtp_get_bandwidth());
+	} else if (status == STATUS_VAR(cam_fps)) {
+		snprintf(buff, buff_len, "%f,%f", video_mjpeg_get_fps(0),
+				video_mjpeg_get_fps(1));
+	} else if (status == STATUS_VAR(cam_frameskip)) {
+		snprintf(buff, buff_len, "%d,%d", video_mjpeg_get_frameskip(0),
+				video_mjpeg_get_frameskip(1));
 	}
 }
+
 static void status_set_value(void *user_data, const char *value) {
 	//STATUS_T *status = (STATUS_T*) user_data;
 }
+
+static STATUS_T *new_status(const char *name) {
+	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+	strcpy(status->name, name);
+	status->get_value = status_get_value;
+	status->set_value = status_set_value;
+	status->release = status_release;
+	status->user_data = status;
+	return status;
+}
+
+static void init_status() {
+	STATUS_INIT(&state->plugin_host, "", ack_command_id);
+	STATUS_INIT(&state->plugin_host, "", quaternion);
+	STATUS_INIT(&state->plugin_host, "", compass);
+	STATUS_INIT(&state->plugin_host, "", temperature);
+	STATUS_INIT(&state->plugin_host, "", bandwidth);
+	STATUS_INIT(&state->plugin_host, "", cam_fps);
+	STATUS_INIT(&state->plugin_host, "", cam_frameskip);
+}
+
+#endif //status block
 
 static void _init_rtp() {
 	init_rtp(9004, "192.168.4.2", 9002, 0);
 	rtp_set_callback((RTP_CALLBACK) rtp_callback);
 
-	{
-		STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
-		strcpy(status->name, "ack_command_id");
-		status->get_value = status_get_value;
-		status->set_value = status_set_value;
-		status->release = status_release;
-		status->user_data = status;
-
-		state->plugin_host.add_status(status);
-	}
+	init_status();
 }
 
 #endif //rtp block
@@ -674,7 +710,7 @@ static void exit_func(void) {
 int main(int argc, char *argv[]) {
 	int opt;
 
-	// Clear application state
+// Clear application state
 	memset(state, 0, sizeof(*state));
 	strncpy(state->mpu_type, "manual", 64);
 
@@ -697,16 +733,16 @@ int main(int argc, char *argv[]) {
 		pthread_mutex_init(&state->cmd_list_mutex, 0);
 	}
 
-	// init plugin
+// init plugin
 	init_plugins(state);
 
-	//init options
+//init options
 	init_options();
 
-	//init rtp
+//init rtp
 	_init_rtp();
 
-	//set mpu
+//set mpu
 	for (int i = 0; state->mpus[i] != NULL; i++) {
 		if (strncmp(state->mpus[i]->name, state->mpu_type, 64) == 0) {
 			state->mpu = state->mpus[i];
@@ -722,7 +758,7 @@ int main(int argc, char *argv[]) {
 	pthread_t transmit_thread;
 	pthread_create(&transmit_thread, NULL, transmit_thread_func, (void*) NULL);
 
-	//readline
+//readline
 	pthread_t readline_thread;
 	pthread_create(&readline_thread, NULL, readline_thread_func, (void*) NULL);
 

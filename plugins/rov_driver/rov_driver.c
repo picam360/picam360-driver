@@ -67,32 +67,6 @@ static void release(void *user_data) {
 	free(user_data);
 }
 
-static bool init_pwm() {
-	int fd = open("/dev/pi-blaster", O_WRONLY);
-	if (fd > 0) {
-		char cmd[256];
-		int len;
-		len = sprintf(cmd, "sync=off\n");
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], lg_motor_center);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], lg_motor_center);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], lg_motor_center);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], lg_motor_center);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "sync=on\n");
-		write(fd, cmd, len);
-		close(fd);
-	}
-	return true;
-}
-
 static void update_pwm() {
 	int len = 0;
 	char cmd[256] = { };
@@ -177,7 +151,7 @@ void *pid_thread_func(void* arg) {
 	gettimeofday(&last_time, NULL);
 	while (1) {
 		usleep(10 * 1000); //less than 100Hz
-		if(lg_lowlevel_control){
+		if (lg_lowlevel_control) {
 			continue;
 		}
 
@@ -327,17 +301,34 @@ void *pid_thread_func(void* arg) {
 	} // end of while
 }
 
-static bool is_init = false;
-static void init() {
-	if (is_init) {
+static bool is_init_pwm = false;
+static void init_pwm() {
+	if (is_init_pwm) {
 		return;
+	} else {
+		is_init_pwm = true;
 	}
-	is_init = true;
-
-	bool succeeded = init_pwm();
-	if (!succeeded) {
-		perror("An error happen in init_pwm().");
-		exit(-1);
+	int fd = open("/dev/pi-blaster", O_WRONLY);
+	if (fd > 0) {
+		char cmd[256];
+		int len;
+		len = sprintf(cmd, "sync=off\n");
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], lg_motor_center);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], lg_motor_center);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], lg_motor_center);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], lg_motor_center);
+		write(fd, cmd, len);
+		len = sprintf(cmd, "sync=on\n");
+		write(fd, cmd, len);
+		close(fd);
 	}
 
 	pthread_t pid_thread;
@@ -368,7 +359,8 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_thrust : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff))
+			== 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
@@ -512,7 +504,7 @@ static void init_options(void *user_data, json_t *options) {
 		}
 	}
 
-	init();//need motor ids
+	init_pwm(); //need motor ids
 }
 
 static void save_options(void *user_data, json_t *options) {
@@ -551,8 +543,109 @@ static wchar_t *get_info(void *user_data) {
 	return lg_info;
 }
 
-void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+#if (1) //status block
+
+#define STATUS_VAR(name) lg_status_ ## name
+#define STATUS_INIT(plugin_host, prefix, name) STATUS_VAR(name) = new_status(prefix #name); \
+                                               (plugin_host)->add_status(STATUS_VAR(name));
+
+static STATUS_T *STATUS_VAR(light_value);
+static STATUS_T *STATUS_VAR(motor_value);
+static STATUS_T *STATUS_VAR(light_strength);
+static STATUS_T *STATUS_VAR(brake_ps);
+static STATUS_T *STATUS_VAR(thrust);
+static STATUS_T *STATUS_VAR(target_quaternion);
+static STATUS_T *STATUS_VAR(lowlevel_control);
+static STATUS_T *STATUS_VAR(pid_enabled);
+static STATUS_T *STATUS_VAR(yaw_diff);
+static STATUS_T *STATUS_VAR(pitch_diff);
+static STATUS_T *STATUS_VAR(p_gain);
+static STATUS_T *STATUS_VAR(i_gain);
+static STATUS_T *STATUS_VAR(d_gain);
+
+static void status_release(void *user_data) {
+	free(user_data);
+}
+static void status_get_value(void *user_data, char *buff, int buff_len) {
+	STATUS_T *status = (STATUS_T*) user_data;
+	if (status == STATUS_VAR(light_value)) {
+		snprintf(buff, buff_len, "%f,%f", lg_light_value[0], lg_light_value[1]);
+	} else if (status == STATUS_VAR(motor_value)) {
+		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_motor_value[0],
+				lg_motor_value[1], lg_motor_value[2], lg_motor_value[3]);
+	} else if (status == STATUS_VAR(light_strength)) {
+		snprintf(buff, buff_len, "%f", lg_light_strength);
+	} else if (status == STATUS_VAR(brake_ps)) {
+		snprintf(buff, buff_len, "%f", lg_brake_ps);
+	} else if (status == STATUS_VAR(thrust)) {
+		snprintf(buff, buff_len, "%f", lg_thrust);
+	} else if (status == STATUS_VAR(target_quaternion)) {
+		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_target_quaternion.x,
+				lg_target_quaternion.y, lg_target_quaternion.z,
+				lg_target_quaternion.w);
+	} else if (status == STATUS_VAR(lowlevel_control)) {
+		snprintf(buff, buff_len, "%d", lg_lowlevel_control ? 1 : 0);
+	} else if (status == STATUS_VAR(pid_enabled)) {
+		snprintf(buff, buff_len, "%d", lg_pid_enabled ? 1 : 0);
+	} else if (status == STATUS_VAR(yaw_diff)) {
+		snprintf(buff, buff_len, "%f", lg_yaw_diff);
+	} else if (status == STATUS_VAR(pitch_diff)) {
+		snprintf(buff, buff_len, "%f", lg_pitch_diff);
+	} else if (status == STATUS_VAR(p_gain)) {
+		snprintf(buff, buff_len, "%f", lg_p_gain);
+	} else if (status == STATUS_VAR(i_gain)) {
+		snprintf(buff, buff_len, "%f", lg_i_gain);
+	} else if (status == STATUS_VAR(d_gain)) {
+		snprintf(buff, buff_len, "%f", lg_d_gain);
+	}
+}
+
+static void status_set_value(void *user_data, const char *value) {
+	//STATUS_T *status = (STATUS_T*) user_data;
+}
+
+static STATUS_T *new_status(const char *name) {
+	STATUS_T *status = (STATUS_T*) malloc(sizeof(STATUS_T));
+	strcpy(status->name, name);
+	status->get_value = status_get_value;
+	status->set_value = status_set_value;
+	status->release = status_release;
+	status->user_data = status;
+	return status;
+}
+
+static void init_status() {
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_value);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", motor_value);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", light_strength);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", brake_ps);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", thrust);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", target_quaternion);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", lowlevel_control);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_enabled);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", yaw_diff);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pitch_diff);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", p_gain);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", i_gain);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", d_gain);
+}
+
+#endif //status block
+
+static bool is_init = false;
+static void init(PLUGIN_HOST_T *plugin_host) {
+	if (is_init) {
+		return;
+	} else {
+		is_init = true;
+	}
 	lg_plugin_host = plugin_host;
+
+	init_status();
+}
+
+void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
+	init(plugin_host);
 
 	{
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
