@@ -48,6 +48,7 @@ public:
 class _FRAME_T {
 public:
 	_FRAME_T() {
+		num_of_bytes = 0;
 		pthread_mutex_init(&packets_mlock, NULL);
 		mrevent_init(&packet_ready);
 	}
@@ -65,6 +66,7 @@ public:
 			delete packet;
 		}
 	}
+	int num_of_bytes;
 	std::list<_PACKET_T *> packets;
 	pthread_mutex_t packets_mlock;
 	MREVENT_T packet_ready;
@@ -195,6 +197,12 @@ static void *camx_thread_func(void* arg) {
 	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
 			(void*) send_frame_arg);
 
+	int stat_ave = 0;
+	int stat_sigma = 0;
+	int stat_n = 0;
+	float stat_ave_sum = 0;
+	float stat_ave2_sum = 0;
+
 	int marker = 0;
 	int soicount = 0;
 	int framecount = 0;
@@ -244,7 +252,38 @@ static void *camx_thread_func(void* arg) {
 							}
 							memcpy(packet->data, buff, packet->len);
 						}
+
+						{ //stat
+							float num_of_bytes = active_frame->num_of_bytes
+									+ packet->len;
+							stat_n++;
+							stat_ave_sum += num_of_bytes;
+							stat_ave2_sum += num_of_bytes * num_of_bytes;
+							if (stat_n > 100) {
+								float ave = (float) stat_ave_sum
+										/ (float) stat_n;
+								float ave2 = (float) stat_ave2_sum
+										/ (float) stat_n;
+								stat_ave = (int) ave;
+								stat_sigma = (int) sqrt(ave2 - ave * ave);
+								stat_sigma += stat_ave / 15; //offset 1/5
+								stat_n = 100;
+								stat_ave_sum = ave * stat_n;
+								stat_ave2_sum = ave2 * stat_n;
+								if ((float) num_of_bytes
+										> (float) stat_ave * 1.5) {
+									stat_n = 0;
+									stat_ave_sum = 0;
+									stat_ave2_sum = 0;
+									stat_ave = 0;
+									stat_sigma = 0;
+									printf("reset stat\n");
+								}
+							}
+						}
+
 						pthread_mutex_lock(&active_frame->packets_mlock);
+						active_frame->num_of_bytes += packet->len;
 						active_frame->packets.push_back(packet);
 						mrevent_trigger(&active_frame->packet_ready);
 						pthread_mutex_unlock(&active_frame->packets_mlock);
@@ -254,6 +293,11 @@ static void *camx_thread_func(void* arg) {
 				}
 			} else if (buff[i] == 0xFF) {
 				marker = 1;
+			} else if (active_frame != NULL && stat_sigma != 0) {
+				int num_of_bytes = active_frame->num_of_bytes + (data_len - i);
+				if ((stat_ave - num_of_bytes) > 3 * stat_sigma) { //skip
+					break;
+				}
 			}
 		}
 		if (active_frame != NULL) {
@@ -269,6 +313,7 @@ static void *camx_thread_func(void* arg) {
 						packet->len = 2 + xmp_len;
 
 						pthread_mutex_lock(&active_frame->packets_mlock);
+						active_frame->num_of_bytes += packet->len;
 						active_frame->packets.push_back(packet);
 						pthread_mutex_unlock(&active_frame->packets_mlock);
 						mrevent_trigger(&active_frame->packet_ready);
@@ -308,6 +353,7 @@ static void *camx_thread_func(void* arg) {
 			}
 			if (packet) {
 				pthread_mutex_lock(&active_frame->packets_mlock);
+				active_frame->num_of_bytes += packet->len;
 				active_frame->packets.push_back(packet);
 				pthread_mutex_unlock(&active_frame->packets_mlock);
 				mrevent_trigger(&active_frame->packet_ready);
