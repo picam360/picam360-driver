@@ -103,6 +103,7 @@ void set_video_mjpeg_xmp_callback(VIDEO_MJPEG_XMP_CALLBACK callback) {
 }
 
 static void *sendframe_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "SEND");
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
 	int last_framecount = send_frame_arg->framecount;
 	struct timeval last_time = { };
@@ -180,6 +181,7 @@ static void *sendframe_thread_func(void* arg) {
 }
 
 static void *camx_thread_func(void* arg) {
+	pthread_setname_np(pthread_self(), "CAM");
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
 	char buff[RTP_MAXPAYLOADSIZE];
 	int buff_size = RTP_MAXPAYLOADSIZE;

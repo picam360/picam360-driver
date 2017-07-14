@@ -171,46 +171,47 @@ void *pid_thread_func(void* arg) {
 		//brake
 		lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
 
+		VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+		//quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI)); //mpu offset
+		//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
+		float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
+		float unif_matrix[16];
+		float camera_matrix[16];
+		float target_matrix[16];
+		mat4_identity(unif_matrix);
+		mat4_identity(camera_matrix);
+		mat4_identity(target_matrix);
+		mat4_fromQuat(camera_matrix, quat.ary);
+		mat4_fromQuat(target_matrix, lg_target_quaternion.ary);
+		mat4_invert(target_matrix, target_matrix);
+		mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
+		mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
+
+		mat4_transpose(vtg, vtg);
+		mat4_multiply(vtg, vtg, unif_matrix);
+		mat4_transpose(vtg, vtg);
+
+		float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
+		lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
+		lg_pitch_diff = atan2(xz, -vtg[1]) * 180 / M_PI; //[-180:180]
+
 		if (lg_pid_enabled) {
 			float x, y, z;
+			if (lg_debugdump) {
+				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("vehicle : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI,
+						z * 180 / M_PI);
+			}
 			if (lg_debugdump) {
 				quaternion_get_euler(lg_target_quaternion, &y, &x, &z,
 						EULER_SEQUENCE_YXZ);
 				printf("target  : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI,
 						z * 180 / M_PI);
 			}
-			VECTOR4D_T quat = lg_plugin_host->get_quaternion();
-			//quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI)); //mpu offset
-			if (lg_debugdump) {
-				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("vehicle : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI,
-						z * 180 / M_PI);
-			}
-			//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
-			float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
-			float unif_matrix[16];
-			float camera_matrix[16];
-			float target_matrix[16];
-			mat4_identity(unif_matrix);
-			mat4_identity(camera_matrix);
-			mat4_identity(target_matrix);
-			mat4_fromQuat(camera_matrix, quat.ary);
-			mat4_fromQuat(target_matrix, lg_target_quaternion.ary);
-			mat4_invert(target_matrix, target_matrix);
-			mat4_multiply(unif_matrix, unif_matrix, target_matrix); // Rt-1
-			mat4_multiply(unif_matrix, unif_matrix, camera_matrix); // RcRt-1
-
-			mat4_transpose(vtg, vtg);
-			mat4_multiply(vtg, vtg, unif_matrix);
-			mat4_transpose(vtg, vtg);
 
 			if (lg_debugdump) {
 				printf("vehicle : %f, %f, %f\n", vtg[0], vtg[1], vtg[2]);
 			}
-
-			float xz = sqrt(vtg[0] * vtg[0] + vtg[2] * vtg[2]);
-			lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
-			lg_pitch_diff = atan2(xz, -vtg[1]) * 180 / M_PI; //[-180:180]
 
 			static float last_yaw = 0;
 			lg_delta_pid_time[0] = time;
@@ -568,6 +569,8 @@ static STATUS_T *STATUS_VAR(pitch_diff);
 static STATUS_T *STATUS_VAR(p_gain);
 static STATUS_T *STATUS_VAR(i_gain);
 static STATUS_T *STATUS_VAR(d_gain);
+static STATUS_T *STATUS_VAR(pid_value);
+static STATUS_T *STATUS_VAR(delta_pid_target);
 
 static void status_release(void *user_data) {
 	free(user_data);
@@ -603,6 +606,10 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 		snprintf(buff, buff_len, "%f", lg_i_gain);
 	} else if (status == STATUS_VAR(d_gain)) {
 		snprintf(buff, buff_len, "%f", lg_d_gain);
+	} else if (status == STATUS_VAR(pid_value)) {
+		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1], lg_pid_value[2]);
+	} else if (status == STATUS_VAR(delta_pid_target)) {
+		snprintf(buff, buff_len, "%f,%f,%f", lg_delta_pid_target[0][0], lg_delta_pid_target[1][0], lg_delta_pid_target[2][0]);
 	}
 }
 
@@ -634,6 +641,8 @@ static void init_status() {
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", p_gain);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", i_gain);
 	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", d_gain);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", pid_value);
+	STATUS_INIT(lg_plugin_host, PLUGIN_NAME ".", delta_pid_target);
 }
 
 #endif //status block
