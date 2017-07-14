@@ -35,10 +35,10 @@ static PLUGIN_HOST_T *lg_plugin_host = NULL;
 
 #define LIGHT_NUM 2
 #define MOTOR_NUM 4
-static float lg_motor_center = 0.0737;
-static float lg_motor_margin = 0.0013;
-static float lg_motor_range = 0.005;
-#define MOTOR_BASE(value) lg_motor_center + lg_motor_margin * ((value == 0) ? 0 : (value > 0) ? 1 : -1)
+static float lg_motor_center = 1500;
+static float lg_motor_margin = 25;
+static float lg_motor_range = 100;
+#define MOTOR_BASE(value) lg_motor_center + lg_motor_margin * ((value < 0.5 && value > -0.5) ? 0 : (value > 0) ? 1 : -1)
 
 static int lg_light_id[LIGHT_NUM] = { 4, 34 };
 static int lg_motor_id[MOTOR_NUM] = { 18, 36, 35, 17 };
@@ -83,14 +83,14 @@ static void update_pwm() {
 	{
 		float value = lg_light_value[0];
 		value = pow(value / 100, 3);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_light_id[0], value);
 		write(fd, cmd, len);
 	}
 
 	{
 		float value = lg_light_value[1];
 		value = pow(value / 100, 3);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_light_id[1], value);
 		write(fd, cmd, len);
 	}
 
@@ -98,7 +98,7 @@ static void update_pwm() {
 		float value = lg_motor_value[0];
 		value = lg_motor_dir[0] * (value / 100)
 				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[0] * value);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[0], value);
 		write(fd, cmd, len);
 	}
 
@@ -106,7 +106,7 @@ static void update_pwm() {
 		float value = lg_motor_value[1];
 		value = lg_motor_dir[1] * (value / 100)
 				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[1] * value);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[1], value);
 		write(fd, cmd, len);
 	}
 
@@ -114,7 +114,7 @@ static void update_pwm() {
 		float value = lg_motor_value[2];
 		value = lg_motor_dir[2] * (value / 100)
 				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[2] * value);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[2], value);
 		write(fd, cmd, len);
 	}
 
@@ -122,7 +122,7 @@ static void update_pwm() {
 		float value = lg_motor_value[3];
 		value = lg_motor_dir[3] * (value / 100)
 				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[3] * value);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], value);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[3], value);
 		write(fd, cmd, len);
 	}
 
@@ -150,7 +150,7 @@ void *pid_thread_func(void* arg) {
 	static struct timeval last_time = { };
 	gettimeofday(&last_time, NULL);
 	while (1) {
-		usleep(10 * 1000); //less than 100Hz
+		usleep(20 * 1000); //less than 50Hz
 		if (lg_lowlevel_control) {
 			continue;
 		}
@@ -314,17 +314,17 @@ static void init_pwm() {
 		int len;
 		len = sprintf(cmd, "sync=off\n");
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
+		len = sprintf(cmd, "%d=%fus\n", lg_light_id[0], 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
+		len = sprintf(cmd, "%d=%fus\n", lg_light_id[1], 0.0f);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[0], lg_motor_center);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[0], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[1], lg_motor_center);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[1], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[2], lg_motor_center);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[2], lg_motor_center);
 		write(fd, cmd, len);
-		len = sprintf(cmd, "%d=%f\n", lg_motor_id[3], lg_motor_center);
+		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[3], lg_motor_center);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "sync=on\n");
 		write(fd, cmd, len);
