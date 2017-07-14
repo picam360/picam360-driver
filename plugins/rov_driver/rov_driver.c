@@ -76,11 +76,6 @@ static void update_pwm() {
 	}
 
 	{
-		len = sprintf(cmd, "sync=off\n");
-		write(fd, cmd, len);
-	}
-
-	{
 		float value = lg_light_value[0];
 		value = pow(value / 100, 3);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], value);
@@ -123,11 +118,6 @@ static void update_pwm() {
 		value = lg_motor_dir[3] * (value / 100)
 				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[3] * value);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[3], value);
-		write(fd, cmd, len);
-	}
-
-	{
-		len = sprintf(cmd, "sync=on\n");
 		write(fd, cmd, len);
 	}
 
@@ -313,8 +303,6 @@ static void init_pwm() {
 	if (fd > 0) {
 		char cmd[256];
 		int len;
-		len = sprintf(cmd, "sync=off\n");
-		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[0], 0.0f);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%f\n", lg_light_id[1], 0.0f);
@@ -326,8 +314,6 @@ static void init_pwm() {
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[2], lg_motor_center);
 		write(fd, cmd, len);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[3], lg_motor_center);
-		write(fd, cmd, len);
-		len = sprintf(cmd, "sync=on\n");
 		write(fd, cmd, len);
 		close(fd);
 	}

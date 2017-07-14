@@ -39,6 +39,7 @@ $(PLUGINS):
 
 clean:
 	for i in $(OBJS); do (if test -e "$$i"; then ( rm $$i ); fi ); done
+	for i in $(PLUGINS); do (if test -e "$$i"; then ( make -C $$i clean ); fi ); done
 	@rm -f $(BIN) $(LIB)
 
 .PRECIOUS: $(OBJS)
