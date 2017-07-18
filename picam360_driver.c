@@ -21,6 +21,7 @@
 #include "picam360_driver.h"
 
 #include "rtp.h"
+#include "rtcp.h"
 #include "video_mjpeg.h"
 #include "quaternion.h"
 #include "manual_mpu.h"
@@ -233,7 +234,7 @@ static void *transmit_thread_func(void* arg) {
 	return NULL;
 }
 
-static int rtp_callback(unsigned char *data, int data_len, int pt,
+static int rtcp_callback(unsigned char *data, int data_len, int pt,
 		unsigned int seq_num) {
 	if (data_len <= 0) {
 		return -1;
@@ -326,7 +327,9 @@ static void init_status() {
 
 static void _init_rtp() {
 	init_rtp(9004, "192.168.4.2", 9002, 0);
-	rtp_set_callback((RTP_CALLBACK) rtp_callback);
+	//rtp_set_callback((RTP_CALLBACK) rtp_callback);
+	init_rtcp(9005, "192.168.4.2", 9003, 0);
+	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
 
 	init_status();
 }

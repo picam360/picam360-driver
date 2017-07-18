@@ -3,16 +3,35 @@
 CURRENT=$(cd $(dirname $0) && pwd)
 cd $CURRENT
 
-CAMERA_WIDTH=2048
-CAMERA_HEIGHT=2048
-#CAMERA_WIDTH=1440
-#CAMERA_HEIGHT=1440
+CAM_NUM=1
+CAM_WIDTH=2048
+CAM_HEIGHT=2048
+#[RASPI,USB]
+TYPE=RASPI
 CAM0=1
 CAM1=0
-RPICAM=true
-USBCAM=false
+VIEW_COODINATE=
+DEBUG=false
 
-sudo killall picam360-driver.bin
+while getopts n:w:h:t:v:g OPT
+do
+    case $OPT in
+        n)  CAM_NUM=$OPTARG
+            ;;
+        w)  CAM_WIDTH=$OPTARG
+            ;;
+        h)  CAM_HEIGHT=$OPTARG
+            ;;
+        t)  TYPE=$OPTARG
+            ;;
+        v)  VIEW_COODINATE="-v $OPTARG"
+            ;;
+        g)  DEBUG=true
+            ;;
+        \?) usage_exit
+            ;;
+    esac
+done
 
 if [ -e cmd ]; then
 	rm cmd
@@ -44,38 +63,88 @@ fi
 mkfifo rtp_tx
 chmod 0666 rtp_tx
 
+if [ -e rtcp_rx ]; then
+	rm rtcp_rx
+fi
+mkfifo rtcp_rx
+chmod 0666 rtcp_rx
+
+if [ -e rtcp_tx ]; then
+	rm rtcp_tx
+fi
+mkfifo rtcp_tx
+chmod 0666 rtcp_tx
+
 #use tcp
 #	sudo killall nc
 #   nc -l -p 9006 < rtp_tx > rtp_rx &
 
 sudo killall socat
-socat -u udp-recv:9004 - > rtp_rx &
+socat -u udp-recv:9003 - > rtcp_rx &
 socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9002 &
+
 #socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
 
-if [ $RPICAM = true ]; then
+if [ $TYPE = "RASPI" ]; then
 
 sudo killall raspivid
 
 # cam0
-/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
-#/usr/bin/raspivid -ih -t 0 -ex sports -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 30 -cs $CAM0 -b 2000000 -o - > cam0 &
-#/usr/bin/raspivid -cd MJPEG -t 0 -ex sports -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
+/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
+#/usr/bin/raspivid -ih -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 30 -cs $CAM0 -b 2000000 -o - > cam0 &
+#/usr/bin/raspivid -cd MJPEG -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
+
+if [ $CAM_NUM = "2" ]; then
 
 # cam1
-/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAMERA_WIDTH -h $CAMERA_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
+/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
 
-elif [ $USBCAM = true ]; then
+fi
+
+elif [ $TYPE = "USB" ]; then
+
+for i in 0 2
+do
+v4l2-ctl --set-ctrl=brightness=-30 -d /dev/video$i
+v4l2-ctl --set-ctrl=gamma=72 -d /dev/video$i
+v4l2-ctl --set-ctrl=contrast=40 -d /dev/video$i
+v4l2-ctl --set-ctrl=saturation=50 -d /dev/video$i
+v4l2-ctl --set-ctrl=white_balance_temperature_auto=1 -d /dev/video$i
+#v4l2-ctl --set-ctrl=white_balance_temperature_auto=0 -d /dev/video$i
+#v4l2-ctl --set-ctrl=white_balance_temperature=2800 -d /dev/video$i
+v4l2-ctl --set-ctrl=sharpness=1 -d /dev/video$i
+v4l2-ctl --set-ctrl=exposure_auto=3 -d /dev/video$i
+done
 
 sudo killall ffmpeg
 
-ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0 2> /dev/null &
-ffmpeg -r 15 -s 2048x1536 -f video4linux2 -input_format mjpeg -i /dev/video1 -vcodec copy pipe:1.mjpeg > cam1 2> /dev/null &
+CAM_RESOLUTION=${CAM_WIDTH}x${CAM_HEIGHT}
+
+ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0 2> /dev/null &
+
+if [ $CAM_NUM = "2" ]; then
+
+ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video2 -vcodec copy pipe:1.mjpeg > cam1 2> /dev/null &
+
+fi
 
 fi
 
 #wait for i2c available
 sleep 3
 
-# driver
-./picam360-driver.bin -v mpu9250
+# picam360-driver
+
+sudo killall picam360-driver.bin
+
+if [ $DEBUG = "true" ]; then
+
+echo main > gdbcmd
+echo r $VIEW_COODINATE >> gdbcmd
+gdb ./picam360-driver.bin -x gdbcmd
+
+else
+
+./picam360-driver.bin $VIEW_COODINATE
+
+fi
