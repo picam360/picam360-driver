@@ -139,7 +139,7 @@ sudo killall picam360-driver.bin
 
 if [ $DEBUG = "true" ]; then
 
-echo main > gdbcmd
+echo b main > gdbcmd
 echo r $VIEW_COODINATE >> gdbcmd
 gdb ./picam360-driver.bin -x gdbcmd
 

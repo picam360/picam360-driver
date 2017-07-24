@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <math.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "MotionSensor.h"
 
@@ -21,6 +22,8 @@
 #define MPU_NAME "mpu9250"
 
 static PLUGIN_HOST_T *lg_plugin_host = NULL;
+static pthread_mutex_t lg_mutex = { };
+static struct timeval lg_base_time = { };
 
 static int lg_i2c_ch = 1;
 
@@ -147,7 +150,16 @@ static void *threadFunc(void *data) {
 						y * 180 / M_PI, z * 180 / M_PI);
 			}
 		}
+		{ //time
+			struct timeval diff;
+			static struct timeval time = { };
+			gettimeofday(&time, NULL);
+			timersub(&time, &lg_base_time, &diff);
+			quat.t = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+		}
+		pthread_mutex_lock(&lg_mutex);
 		lg_quat = quat;
+		pthread_mutex_unlock(&lg_mutex);
 
 		usleep(5000);
 	} while (1);
@@ -210,6 +222,8 @@ static void init(PLUGIN_HOST_T *plugin_host) {
 		is_init = true;
 	}
 	lg_plugin_host = plugin_host;
+	pthread_mutex_init(&lg_mutex, 0);
+	gettimeofday(&lg_base_time, NULL);
 
 	ms_open(lg_i2c_ch);
 
@@ -225,7 +239,11 @@ static void init(PLUGIN_HOST_T *plugin_host) {
 }
 
 static VECTOR4D_T get_quaternion() {
-	return lg_quat;
+	VECTOR4D_T quat;
+	pthread_mutex_lock(&lg_mutex);
+	quat = lg_quat;
+	pthread_mutex_unlock(&lg_mutex);
+	return quat;
 }
 
 static VECTOR4D_T get_compass() {

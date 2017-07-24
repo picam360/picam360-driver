@@ -60,8 +60,7 @@ static float lg_p_gain = 1.0;
 static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
 static float lg_pid_value[3] = { }; //x, z, delta yaw
-static float lg_delta_pid_target[3][3] = { }; //x, z, delta yaw
-static struct timeval lg_delta_pid_time[3] = { };
+static float lg_delta_pid_target[3][4] = { }; //[history][x, z, delta yaw, t]
 
 static void release(void *user_data) {
 	free(user_data);
@@ -137,31 +136,18 @@ static bool lg_debugdump = false;
 void *pid_thread_func(void* arg) {
 	pthread_setname_np(pthread_self(), "DA PID");
 
-	static struct timeval last_time = { };
-	gettimeofday(&last_time, NULL);
+	static float last_time = -1;
 	while (1) {
 		usleep(20 * 1000); //less than 50Hz
 		if (lg_lowlevel_control) {
 			continue;
 		}
 
-		struct timeval time = { };
-		gettimeofday(&time, NULL);
-		struct timeval diff;
-		timersub(&time, &last_time, &diff);
-		float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
-		//cal
-		//trancate min max
-		lg_light_strength = MIN(MAX(lg_light_strength, 0), 100);
-		lg_light_value[0] = lg_light_strength;
-		lg_light_value[1] = lg_light_strength;
-
-		//trancate min max
-		lg_thrust = MIN(MAX(lg_thrust, -100), 100);
-		//brake
-		lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
-
 		VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+		if (last_time < 0) { //init last_time
+			last_time = quat.t;
+			continue;
+		}
 		//quat = quaternion_multiply(quat, quaternion_get_from_z(M_PI)); //mpu offset
 		//(RcRt-1Rc-1)*(Rc)*vtg, target coordinate will be converted into camera coordinate
 		float vtg[16] = { 0, -1, 0, 1 }; // looking at ground
@@ -185,6 +171,22 @@ void *pid_thread_func(void* arg) {
 		lg_yaw_diff = -atan2(vtg[2], vtg[0]) * 180 / M_PI;
 		lg_pitch_diff = atan2(xz, -vtg[1]) * 180 / M_PI; //[-180:180]
 
+		//time
+		float diff_sec = quat.t - last_time;
+		if (diff_sec < 1E-6) { //<1us need to wait
+			continue;
+		}
+		//cal
+		//trancate min max
+		lg_light_strength = MIN(MAX(lg_light_strength, 0), 100);
+		lg_light_value[0] = lg_light_strength;
+		lg_light_value[1] = lg_light_strength;
+
+		//trancate min max
+		lg_thrust = MIN(MAX(lg_thrust, -100), 100);
+		//brake
+		lg_thrust *= exp(log(1.0 - lg_brake_ps / 100) * diff_sec);
+
 		if (lg_pid_enabled) {
 			float x, y, z;
 			if (lg_debugdump) {
@@ -204,28 +206,27 @@ void *pid_thread_func(void* arg) {
 			}
 
 			static float last_yaw = 0;
-			lg_delta_pid_time[0] = time;
 			lg_delta_pid_target[0][0] = cos(lg_yaw_diff * M_PI / 180)
 					* (lg_pitch_diff / 180); // x [-1:1]
-			lg_delta_pid_target[1][0] = sin(lg_yaw_diff * M_PI / 180)
+			lg_delta_pid_target[0][1] = sin(lg_yaw_diff * M_PI / 180)
 					* (lg_pitch_diff / 180); // z [-1:1]
-			lg_delta_pid_target[2][0] = sub_angle(lg_yaw_diff, last_yaw) / 180; // delta yaw [-1:1]
+			lg_delta_pid_target[0][2] = sub_angle(lg_yaw_diff, last_yaw) / 180; // delta yaw [-1:1]
+			lg_delta_pid_target[0][3] = quat.t;
 
-			timersub(&lg_delta_pid_time[0], &lg_delta_pid_time[1], &diff);
-			diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
+			diff_sec = lg_delta_pid_target[0][3] - lg_delta_pid_target[1][3];
 			diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
 
 			for (int k = 0; k < 3; k++) {
 				float p_value =
 						lg_p_gain
-								* (lg_delta_pid_target[k][0]
-										- lg_delta_pid_target[k][1]);
-				float i_value = lg_i_gain * lg_delta_pid_target[k][0]
+								* (lg_delta_pid_target[0][k]
+										- lg_delta_pid_target[1][k]);
+				float i_value = lg_i_gain * lg_delta_pid_target[0][k]
 						* diff_sec;
 				float d_value = lg_d_gain
-						* (lg_delta_pid_target[k][0]
-								- 2 * lg_delta_pid_target[k][1]
-								+ lg_delta_pid_target[k][2]) / diff_sec;
+						* (lg_delta_pid_target[0][k]
+								- 2 * lg_delta_pid_target[1][k]
+								+ lg_delta_pid_target[2][k]) / diff_sec;
 				float delta_value = p_value + i_value + d_value;
 				lg_pid_value[k] += delta_value;
 				lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -2500), 2500);
@@ -233,10 +234,9 @@ void *pid_thread_func(void* arg) {
 
 			//increment
 			for (int j = 3 - 1; j >= 1; j--) {
-				for (int k = 0; k < 3; k++) {
-					lg_delta_pid_target[k][j] = lg_delta_pid_target[k][j - 1];
+				for (int k = 0; k < 4; k++) {
+					lg_delta_pid_target[j][k] = lg_delta_pid_target[j - 1][k];
 				}
-				lg_delta_pid_time[j] = lg_delta_pid_time[j - 1];
 			}
 			last_yaw = lg_yaw_diff;
 
@@ -288,7 +288,7 @@ void *pid_thread_func(void* arg) {
 		}
 		update_pwm();
 
-		last_time = time;
+		last_time = quat.t;
 	} // end of while
 }
 
@@ -402,6 +402,45 @@ static int command_handler(void *user_data, const char *_buff) {
 			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
 
 			printf("set_pid_enabled : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_p_gain", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value;
+			sscanf(param, "%f", &value);
+
+			lg_p_gain = value;
+			lg_thrust = 0;
+			memset(lg_pid_value, 0, sizeof(lg_pid_value));
+			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+
+			printf("set_p_gain : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_i_gain", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value;
+			sscanf(param, "%f", &value);
+
+			lg_i_gain = value;
+			lg_thrust = 0;
+			memset(lg_pid_value, 0, sizeof(lg_pid_value));
+			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+
+			printf("set_i_gain : completed\n");
+		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_d_gain", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			float value;
+			sscanf(param, "%f", &value);
+
+			lg_d_gain = value;
+			lg_thrust = 0;
+			memset(lg_pid_value, 0, sizeof(lg_pid_value));
+			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
+
+			printf("set_d_gain : completed\n");
 		}
 	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
 			== 0) {
@@ -593,9 +632,11 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(d_gain)) {
 		snprintf(buff, buff_len, "%f", lg_d_gain);
 	} else if (status == STATUS_VAR(pid_value)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1], lg_pid_value[2]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1],
+				lg_pid_value[2]);
 	} else if (status == STATUS_VAR(delta_pid_target)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_delta_pid_target[0][0], lg_delta_pid_target[1][0], lg_delta_pid_target[2][0]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_delta_pid_target[0][0],
+				lg_delta_pid_target[0][1], lg_delta_pid_target[0][2]);
 	}
 }
 
