@@ -215,13 +215,12 @@ static void init_status() {
 #endif //status block
 
 static bool is_init = false;
-static void init(PLUGIN_HOST_T *plugin_host) {
+static void init() {
 	if (is_init) {
 		return;
 	} else {
 		is_init = true;
 	}
-	lg_plugin_host = plugin_host;
 	pthread_mutex_init(&lg_mutex, 0);
 	gettimeofday(&lg_base_time, NULL);
 
@@ -310,6 +309,7 @@ static void init_options(void *user_data, json_t *options) {
 		lg_compass_max[i] = json_number_value(json_object_get(options, buff));
 	}
 
+	init();
 }
 
 static void save_options(void *user_data, json_t *options) {
@@ -344,7 +344,7 @@ static wchar_t *get_info(void *user_data) {
 }
 
 void create_plugin(PLUGIN_HOST_T *plugin_host, PLUGIN_T **_plugin) {
-	init(plugin_host);
+	lg_plugin_host = plugin_host;
 
 	{
 		PLUGIN_T *plugin = (PLUGIN_T*) malloc(sizeof(PLUGIN_T));
