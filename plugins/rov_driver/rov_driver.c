@@ -329,14 +329,14 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_thrust", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".increment_thrust", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
 			int num = sscanf(param, "%f", &v);
 
 			if (num == 1) {
-				lg_thrust = v;
+				lg_thrust += v;
 				param = strtok(NULL, " \n");
 				if (param != NULL) {
 					float x, y, z, w;
