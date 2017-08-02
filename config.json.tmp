@@ -15,8 +15,7 @@
     "picam360_driver.cam1_offset_x": 0.0,
     "picam360_driver.cam1_offset_y": -0.029999990016222,
     "plugin_paths": [
-        "plugins/mpu9250.so",
-        "plugins/rov_driver.so"
+        "plugins/mpu9250.so"
     ],
     "picam360_driver.cam1_offset_yaw": 0.0,
     "rov_driver.motor2_dir": -1.0,
