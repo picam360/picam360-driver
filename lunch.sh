@@ -90,14 +90,14 @@ if [ $TYPE = "RASPI" ]; then
 sudo killall raspivid
 
 # cam0
-/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
+/usr/bin/raspivid -cd MJPEG -n -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
 #/usr/bin/raspivid -ih -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 30 -cs $CAM0 -b 2000000 -o - > cam0 &
-#/usr/bin/raspivid -cd MJPEG -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
+#/usr/bin/raspivid -cd MJPEG -n -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
 
 if [ $CAM_NUM = "2" ]; then
 
 # cam1
-/usr/bin/raspivid -cd MJPEG -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
+/usr/bin/raspivid -cd MJPEG -n -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
 
 fi
 

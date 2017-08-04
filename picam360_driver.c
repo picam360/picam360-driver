@@ -511,10 +511,12 @@ static void send_command(const char *cmd) {
 	pthread_mutex_unlock(&state->cmd_list_mutex);
 }
 static void send_event(uint32_t node_id, uint32_t event_id) {
-	for (int i = 0; state->plugins[i] != NULL; i++) {
-		if (state->plugins[i]) {
-			state->plugins[i]->event_handler(state->plugins[i]->user_data,
-					node_id, event_id);
+	if (state->plugins) {
+		for (int i = 0; state->plugins[i] != NULL; i++) {
+			if (state->plugins[i]) {
+				state->plugins[i]->event_handler(state->plugins[i]->user_data,
+						node_id, event_id);
+			}
 		}
 	}
 }
@@ -673,13 +675,15 @@ int command_handler() {
 
 	if (buff) {
 		bool handled = false;
-		for (int i = 0; state->plugins[i] != NULL; i++) {
-			int name_len = strlen(state->plugins[i]->name);
-			if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-					&& buff[name_len] == '.') {
-				ret = state->plugins[i]->command_handler(
-						state->plugins[i]->user_data, buff);
-				handled = true;
+		if (state->plugins) {
+			for (int i = 0; state->plugins[i] != NULL; i++) {
+				int name_len = strlen(state->plugins[i]->name);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
+						&& buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(
+							state->plugins[i]->user_data, buff);
+					handled = true;
+				}
 			}
 		}
 		if (!handled) {
