@@ -75,15 +75,19 @@ fi
 mkfifo rtcp_tx
 chmod 0666 rtcp_tx
 
+if [ "$CAPTURE_IP" = "" ]; then
+	CAPTURE_IP="192.168.4.2"
+fi
+
 #use tcp
 #	sudo killall nc
 #   nc -l -p 9006 < rtp_tx > rtp_rx &
 
 sudo killall socat
 socat -u udp-recv:9003 - > rtcp_rx &
-socat PIPE:rtp_tx UDP-DATAGRAM:192.168.4.2:9002 &
+socat PIPE:rtp_tx UDP-DATAGRAM:$CAPTURE_IP:9002 &
 
-#socat tcp-connect:192.168.4.2:9002 PIPE:rtp_tx &
+#socat tcp-connect:$CAPTURE_IP:9002 PIPE:rtp_tx &
 
 if [ $TYPE = "RASPI" ]; then
 
