@@ -109,18 +109,10 @@ fi
 
 elif [ $TYPE = "USB" ]; then
 
-for i in 0 2
-do
-v4l2-ctl --set-ctrl=brightness=-30 -d /dev/video$i
-v4l2-ctl --set-ctrl=gamma=72 -d /dev/video$i
-v4l2-ctl --set-ctrl=contrast=40 -d /dev/video$i
-v4l2-ctl --set-ctrl=saturation=50 -d /dev/video$i
-v4l2-ctl --set-ctrl=white_balance_temperature_auto=1 -d /dev/video$i
-#v4l2-ctl --set-ctrl=white_balance_temperature_auto=0 -d /dev/video$i
-#v4l2-ctl --set-ctrl=white_balance_temperature=2800 -d /dev/video$i
-v4l2-ctl --set-ctrl=sharpness=1 -d /dev/video$i
-v4l2-ctl --set-ctrl=exposure_auto=3 -d /dev/video$i
-done
+bash v4l2-ctl.sh /dev/video0
+if [ $CAM_NUM = "2" ]; then
+bash v4l2-ctl.sh /dev/video2
+fi
 
 sudo killall ffmpeg
 
