@@ -33,7 +33,7 @@
 
 #define CONFIG_FILE "config.json"
 #define PATH "./"
-#define PICAM360_HISTORY_FILE ".picam360-driver-history"
+#define PICAM360_HISTORY_FILE ".picam360_history"
 #define PLUGIN_NAME "picam360_driver"
 
 static volatile int terminate;
