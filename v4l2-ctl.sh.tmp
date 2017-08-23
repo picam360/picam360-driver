@@ -1,8 +1,8 @@
 
-v4l2-ctl --set-ctrl=brightness=-30 -d $1
-v4l2-ctl --set-ctrl=gamma=72 -d $1
+v4l2-ctl --set-ctrl=brightness=0 -d $1
+v4l2-ctl --set-ctrl=gamma=120 -d $1
 v4l2-ctl --set-ctrl=contrast=40 -d $1
-v4l2-ctl --set-ctrl=saturation=50 -d $1
+v4l2-ctl --set-ctrl=saturation=100 -d $1
 v4l2-ctl --set-ctrl=white_balance_temperature_auto=1 -d $1
 #v4l2-ctl --set-ctrl=white_balance_temperature_auto=0 -d $1
 #v4l2-ctl --set-ctrl=white_balance_temperature=2800 -d $1
