@@ -17,6 +17,16 @@
     "plugin_paths": [
         "plugins/mpu9250.so"
     ],
+    "v4l2_ctls": {
+        "brightness" : 0,
+        "gamma" : 120,
+        "contrast" : 40,
+        "saturation" : 100,
+        "sharpness" : 1,
+        "white_balance_temperature_auto" : 1,
+        "white_balance_temperature" : 2800,
+        "exposure_auto" : 3
+    },
     "picam360_driver.cam1_offset_yaw": 0.0,
     "rov_driver.motor2_dir": -1.0,
     "rov_driver.i_gain": 20.0,

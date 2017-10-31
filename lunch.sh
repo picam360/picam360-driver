@@ -109,11 +109,6 @@ fi
 
 elif [ $TYPE = "USB" ]; then
 
-bash v4l2-ctl.sh /dev/video0
-if [ $CAM_NUM = "2" ]; then
-bash v4l2-ctl.sh /dev/video2
-fi
-
 sudo killall ffmpeg
 
 CAM_RESOLUTION=${CAM_WIDTH}x${CAM_HEIGHT}

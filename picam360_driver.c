@@ -55,6 +55,42 @@ static int lg_ack_command_id = 0;
 static void init_options();
 static void save_options();
 
+static void set_v4l2_ctl(const char *name, const int value) {
+	for (int i = 0; i < CAMERA_NUM; i++) {
+		char cmd[256];
+		sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d /dev/video%d", name, value, (i == 0) ? 0 : 2);
+		system(cmd);
+	}
+}
+
+static void add_v4l2_ctl(V4l2_CTL_T *ctl) {
+	if (state->v4l2_ctls == NULL) {
+		const int INITIAL_SPACE = 16;
+		state->v4l2_ctls = malloc(sizeof(V4l2_CTL_T*) * INITIAL_SPACE);
+		memset(state->v4l2_ctls, 0, sizeof(V4l2_CTL_T*) * INITIAL_SPACE);
+		state->v4l2_ctls[INITIAL_SPACE - 1] = (void*) -1;
+	}
+
+	for (int i = 0; state->v4l2_ctls[i] != (void*) -1; i++) {
+		if (state->v4l2_ctls[i] == NULL) {
+			state->v4l2_ctls[i] = ctl;
+			return;
+		}
+		if (state->v4l2_ctls[i + 1] == (void*) -1) {
+			int space = (i + 2) * 2;
+			if (space > 256) {
+				fprintf(stderr, "error on add_mpu\n");
+				return;
+			}
+			V4l2_CTL_T **current = state->v4l2_ctls;
+			state->v4l2_ctls = malloc(sizeof(V4l2_CTL_T*) * space);
+			memcpy(state->v4l2_ctls, current, sizeof(V4l2_CTL_T*) * (i + 1));
+			state->v4l2_ctls[space - 1] = (void*) -1;
+			free(current);
+		}
+	}
+}
+
 static int _command_handler(const char *_buff) {
 	char buff[256];
 	strncpy(buff, _buff, sizeof(buff));
@@ -62,13 +98,10 @@ static int _command_handler(const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0
-			|| strncmp(cmd, "q", sizeof(buff)) == 0
-			|| strncmp(cmd, "quit", sizeof(buff)) == 0) {
+	} else if (strncmp(cmd, "exit", sizeof(buff)) == 0 || strncmp(cmd, "q", sizeof(buff)) == 0 || strncmp(cmd, "quit", sizeof(buff)) == 0) {
 		printf("exit\n");
 		exit(0);
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_video_delay", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value = 0;
@@ -76,8 +109,7 @@ static int _command_handler(const char *_buff) {
 			lg_video_delay = MAX(MIN(value,MAX_DELAY_COUNT), 0);
 			printf("set_video_delay : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_x", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_x", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int cam_num = 0;
@@ -88,8 +120,7 @@ static int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_offset_x : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_y", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_y", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int cam_num = 0;
@@ -100,8 +131,7 @@ static int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_offset_y : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_yaw", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_offset_yaw", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int cam_num = 0;
@@ -112,8 +142,7 @@ static int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_offset_yaw : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_horizon_r", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_camera_horizon_r", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int cam_num = 0;
@@ -131,6 +160,24 @@ static int _command_handler(const char *_buff) {
 			}
 			printf("add_camera_horizon_r : completed\n");
 		}
+	} else if (strncmp(cmd, PLUGIN_NAME ".add_v4l2_ctl", sizeof(buff)) == 0) {
+		char *param = strtok(NULL, " \n");
+		if (param != NULL) {
+			char name[256] = { };
+			int value = 0;
+			int num = sscanf(param, "%255[^=]=%d", name, &value);
+			if (num == 2) {
+				for (int i = 0; state->v4l2_ctls[i] != NULL; i++) {
+					if (strcmp(state->v4l2_ctls[i]->name, name) == 0) {
+						state->v4l2_ctls[i]->value += value;
+						set_v4l2_ctl(state->v4l2_ctls[i]->name, state->v4l2_ctls[i]->value);
+						break;
+					}
+				}
+			}
+
+			printf("add_v4l2_ctl : completed\n");
+		}
 	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
 		save_options();
 		printf("save : completed\n");
@@ -145,8 +192,7 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 
 	VECTOR4D_T quat = { };
 	{
-		int cur = (lg_video_delay_cur - (int) lg_video_delay + MAX_DELAY_COUNT)
-				% MAX_DELAY_COUNT;
+		int cur = (lg_video_delay_cur - (int) lg_video_delay + MAX_DELAY_COUNT) % MAX_DELAY_COUNT;
 		quat = lg_quaternion_queue[cur];
 	}
 	VECTOR4D_T compass = state->plugin_host.get_compass();
@@ -163,25 +209,15 @@ static int xmp(char *buff, int buff_len, int cam_num) {
 	buff[xmp_len++] = 0xBB;
 	buff[xmp_len++] = 0xBF;
 	xmp_len += sprintf(buff + xmp_len, "\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-drive rev1\">");
-	xmp_len +=
-			sprintf(buff + xmp_len,
-					"<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
+	xmp_len += sprintf(buff + xmp_len, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"picam360-drive rev1\">");
+	xmp_len += sprintf(buff + xmp_len, "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">");
 	xmp_len += sprintf(buff + xmp_len, "<rdf:Description rdf:about=\"\">");
-	xmp_len += sprintf(buff + xmp_len,
-			"<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x,
-			quat.y, quat.z, quat.w);
-	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />",
-			compass.x, compass.y, compass.z);
-	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />",
-			state->plugin_host.get_temperature());
+	xmp_len += sprintf(buff + xmp_len, "<quaternion x=\"%f\" y=\"%f\" z=\"%f\" w=\"%f\" />", quat.x, quat.y, quat.z, quat.w);
+	xmp_len += sprintf(buff + xmp_len, "<compass x=\"%f\" y=\"%f\" z=\"%f\" />", compass.x, compass.y, compass.z);
+	xmp_len += sprintf(buff + xmp_len, "<temperature v=\"%f\" />", state->plugin_host.get_temperature());
 	if (cam_num >= 0 && cam_num < CAMERA_NUM) {
-		xmp_len += sprintf(buff + xmp_len,
-				"<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />",
-				lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y,
-				lg_camera_offset[cam_num].z, lg_camera_offset[cam_num].w);
+		xmp_len += sprintf(buff + xmp_len, "<offset x=\"%f\" y=\"%f\" yaw=\"%f\" horizon_r=\"%f\" />", lg_camera_offset[cam_num].x, lg_camera_offset[cam_num].y, lg_camera_offset[cam_num].z,
+				lg_camera_offset[cam_num].w);
 	}
 	xmp_len += sprintf(buff + xmp_len, "</rdf:Description>");
 	xmp_len += sprintf(buff + xmp_len, "</rdf:RDF>");
@@ -211,12 +247,9 @@ static void *transmit_thread_func(void* arg) {
 			char statuses[RTP_MAXPAYLOADSIZE];
 			for (int i = 0; state->statuses[i]; i++) {
 				char value[256] = { };
-				state->statuses[i]->get_value(state->statuses[i]->user_data,
-						value, sizeof(value));
+				state->statuses[i]->get_value(state->statuses[i]->user_data, value, sizeof(value));
 				char buff[256];
-				int len = snprintf(buff, sizeof(buff),
-						"<picam360:status name=\"%s\" value=\"%s\" />",
-						state->statuses[i]->name, value);
+				int len = snprintf(buff, sizeof(buff), "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, value);
 				if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
 					rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
 					cur = 0;
@@ -234,8 +267,7 @@ static void *transmit_thread_func(void* arg) {
 	return NULL;
 }
 
-static int rtcp_callback(unsigned char *data, int data_len, int pt,
-		unsigned int seq_num) {
+static int rtcp_callback(unsigned char *data, int data_len, int pt, unsigned int seq_num) {
 	if (data_len <= 0) {
 		return -1;
 	}
@@ -248,9 +280,7 @@ static int rtcp_callback(unsigned char *data, int data_len, int pt,
 	if (pt == PT_CMD) {
 		int id;
 		char value[256];
-		int num = sscanf((char*) data,
-				"<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id,
-				value);
+		int num = sscanf((char*) data, "<picam360:command id=\"%d\" value=\"%255[^\"]\" />", &id, value);
 		if (num == 2 && id != lg_ack_command_id) {
 			lg_ack_command_id = id;
 			state->plugin_host.send_command(value);
@@ -291,11 +321,9 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(bandwidth)) {
 		snprintf(buff, buff_len, "%f", rtp_get_bandwidth());
 	} else if (status == STATUS_VAR(cam_fps)) {
-		snprintf(buff, buff_len, "%f,%f", video_mjpeg_get_fps(0),
-				video_mjpeg_get_fps(1));
+		snprintf(buff, buff_len, "%f,%f", video_mjpeg_get_fps(0), video_mjpeg_get_fps(1));
 	} else if (status == STATUS_VAR(cam_frameskip)) {
-		snprintf(buff, buff_len, "%d,%d", video_mjpeg_get_frameskip(0),
-				video_mjpeg_get_frameskip(1));
+		snprintf(buff, buff_len, "%d,%d", video_mjpeg_get_frameskip(0), video_mjpeg_get_frameskip(1));
 	}
 }
 
@@ -345,25 +373,19 @@ static void init_options() {
 	if (options == NULL) {
 		fputs(error.text, stderr);
 	} else {
-		lg_skip_frame = json_number_value(
-				json_object_get(options, PLUGIN_NAME ".skip_frame"));
-		lg_video_delay = json_number_value(
-				json_object_get(options, PLUGIN_NAME ".video_delay"));
+		lg_skip_frame = json_number_value(json_object_get(options, PLUGIN_NAME ".skip_frame"));
+		lg_video_delay = json_number_value(json_object_get(options, PLUGIN_NAME ".video_delay"));
 
 		for (int i = 0; i < CAMERA_NUM; i++) {
 			char buff[256];
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_x", i);
-			lg_camera_offset[i].x = json_number_value(
-					json_object_get(options, buff));
+			lg_camera_offset[i].x = json_number_value(json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_y", i);
-			lg_camera_offset[i].y = json_number_value(
-					json_object_get(options, buff));
+			lg_camera_offset[i].y = json_number_value(json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_offset_yaw", i);
-			lg_camera_offset[i].z = json_number_value(
-					json_object_get(options, buff));
+			lg_camera_offset[i].z = json_number_value(json_object_get(options, buff));
 			sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
-			lg_camera_offset[i].w = json_number_value(
-					json_object_get(options, buff));
+			lg_camera_offset[i].w = json_number_value(json_object_get(options, buff));
 			if (lg_camera_offset[i].w == 0) {
 				lg_camera_offset[i].w = 0.8;
 			}
@@ -372,27 +394,22 @@ static void init_options() {
 			json_t *plugin_paths = json_object_get(options, "plugin_paths");
 			if (json_is_array(plugin_paths)) {
 				int size = json_array_size(plugin_paths);
-				state->plugin_paths = (char**) malloc(
-						sizeof(char*) * (size + 1));
+				state->plugin_paths = (char**) malloc(sizeof(char*) * (size + 1));
 				memset(state->plugin_paths, 0, sizeof(char*) * (size + 1));
 
 				for (int i = 0; i < size; i++) {
 					json_t *value = json_array_get(plugin_paths, i);
 					int len = json_string_length(value);
-					state->plugin_paths[i] = (char*) malloc(
-							sizeof(char) * (len + 1));
+					state->plugin_paths[i] = (char*) malloc(sizeof(char) * (len + 1));
 					memset(state->plugin_paths[i], 0, sizeof(char) * (len + 1));
-					strncpy(state->plugin_paths[i], json_string_value(value),
-							len);
+					strncpy(state->plugin_paths[i], json_string_value(value), len);
 					if (len > 0) {
-						void *handle = dlopen(state->plugin_paths[i],
-								RTLD_LAZY);
+						void *handle = dlopen(state->plugin_paths[i], RTLD_LAZY);
 						if (!handle) {
 							fprintf(stderr, "%s\n", dlerror());
 							continue;
 						}
-						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(
-								handle, "create_plugin");
+						CREATE_PLUGIN create_plugin = (CREATE_PLUGIN) dlsym(handle, "create_plugin");
 						if (!create_plugin) {
 							fprintf(stderr, "%s\n", dlerror());
 							dlclose(handle);
@@ -410,13 +427,31 @@ static void init_options() {
 				}
 			}
 		}
+		{
+			json_t *v4l2_ctls = json_object_get(options, "v4l2_ctls");
+			const char *key;
+			json_t *value;
+
+			json_object_foreach(v4l2_ctls, key, value)
+			{
+				V4l2_CTL_T *ctl = (V4l2_CTL_T*) malloc(sizeof(V4l2_CTL_T));
+				strncpy(ctl->name, key, sizeof(ctl->name));
+				ctl->value = json_number_value(value);
+				add_v4l2_ctl(ctl);
+			}
+		}
 
 		if (state->plugins) {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				if (state->plugins[i]->init_options) {
-					state->plugins[i]->init_options(
-							state->plugins[i]->user_data, options);
+					state->plugins[i]->init_options(state->plugins[i]->user_data, options);
 				}
+			}
+		}
+
+		if (state->v4l2_ctls) {
+			for (int i = 0; state->v4l2_ctls[i] != NULL; i++) {
+				set_v4l2_ctl(state->v4l2_ctls[i]->name, state->v4l2_ctls[i]->value);
 			}
 		}
 
@@ -427,10 +462,8 @@ static void init_options() {
 static void save_options() {
 	json_t *options = json_object();
 
-	json_object_set_new(options, PLUGIN_NAME ".skip_frame",
-			json_real(lg_skip_frame));
-	json_object_set_new(options, PLUGIN_NAME ".video_delay",
-			json_real(lg_video_delay));
+	json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
+	json_object_set_new(options, PLUGIN_NAME ".video_delay", json_real(lg_video_delay));
 
 	for (int i = 0; i < CAMERA_NUM; i++) {
 		char buff[256];
@@ -447,8 +480,7 @@ static void save_options() {
 	if (state->plugin_paths) {
 		json_t *plugin_paths = json_array();
 		for (int i = 0; state->plugin_paths[i] != NULL; i++) {
-			json_array_append_new(plugin_paths,
-					json_string(state->plugin_paths[i]));
+			json_array_append_new(plugin_paths, json_string(state->plugin_paths[i]));
 		}
 		json_object_set_new(options, "plugin_paths", plugin_paths);
 	}
@@ -456,10 +488,17 @@ static void save_options() {
 	if (state->plugins) {
 		for (int i = 0; state->plugins[i] != NULL; i++) {
 			if (state->plugins[i]->save_options) {
-				state->plugins[i]->save_options(state->plugins[i]->user_data,
-						options);
+				state->plugins[i]->save_options(state->plugins[i]->user_data, options);
 			}
 		}
+	}
+
+	if (state->v4l2_ctls) {
+		json_t *v4l2_ctls = json_object();
+		for (int i = 0; state->v4l2_ctls[i] != NULL; i++) {
+			json_object_set(v4l2_ctls, state->v4l2_ctls[i]->name, json_real(state->v4l2_ctls[i]->value));
+		}
+		json_object_set_new(options, "v4l2_ctls", v4l2_ctls);
 	}
 
 	json_dump_file(options, CONFIG_FILE, JSON_INDENT(4));
@@ -514,8 +553,7 @@ static void send_event(uint32_t node_id, uint32_t event_id) {
 	if (state->plugins) {
 		for (int i = 0; state->plugins[i] != NULL; i++) {
 			if (state->plugins[i]) {
-				state->plugins[i]->event_handler(state->plugins[i]->user_data,
-						node_id, event_id);
+				state->plugins[i]->event_handler(state->plugins[i]->user_data, node_id, event_id);
 			}
 		}
 	}
@@ -678,10 +716,8 @@ int command_handler() {
 		if (state->plugins) {
 			for (int i = 0; state->plugins[i] != NULL; i++) {
 				int name_len = strlen(state->plugins[i]->name);
-				if (strncmp(buff, state->plugins[i]->name, name_len) == 0
-						&& buff[name_len] == '.') {
-					ret = state->plugins[i]->command_handler(
-							state->plugins[i]->user_data, buff);
+				if (strncmp(buff, state->plugins[i]->name, name_len) == 0 && buff[name_len] == '.') {
+					ret = state->plugins[i]->command_handler(state->plugins[i]->user_data, buff);
 					handled = true;
 				}
 			}
