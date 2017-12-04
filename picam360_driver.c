@@ -29,8 +29,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define CAMERA_NUM 2
-
 #define CONFIG_FILE "config.json"
 #define PATH "./"
 #define PICAM360_HISTORY_FILE ".picam360_history"
@@ -57,9 +55,11 @@ static void save_options();
 
 static void set_v4l2_ctl(const char *name, const int value) {
 	for (int i = 0; i < CAMERA_NUM; i++) {
-		char cmd[256];
-		sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d /dev/video%d", name, value, (i == 0) ? 0 : 2);
-		system(cmd);
+		if (state->options.v4l2_devicefile[i][0] != '\0') {
+			char cmd[256];
+			sprintf(cmd, "v4l2-ctl --set-ctrl=%s=%d -d %s", name, value, state->options.v4l2_devicefile[i]);
+			system(cmd);
+		}
 	}
 }
 
@@ -388,6 +388,33 @@ static void init_options() {
 			lg_camera_offset[i].w = json_number_value(json_object_get(options, buff));
 			if (lg_camera_offset[i].w == 0) {
 				lg_camera_offset[i].w = 0.8;
+			}
+			sprintf(buff, PLUGIN_NAME ".cam%d_width", i);
+			state->options.cam_width[i] = json_number_value(json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".cam%d_height", i);
+			state->options.cam_height[i] = json_number_value(json_object_get(options, buff));
+			sprintf(buff, PLUGIN_NAME ".cam%d_fps", i);
+			state->options.cam_fps[i] = json_number_value(json_object_get(options, buff));
+			{
+				sprintf(buff, PLUGIN_NAME ".cam%d_v4l2_devicefile", i);
+				json_t *value = json_object_get(options, buff);
+				if (value) {
+					int len = json_string_length(value);
+					if (len < sizeof(state->options.v4l2_devicefile[i])) {
+						strncpy(state->options.v4l2_devicefile[i], json_string_value(value), len);
+					}
+				}
+			}
+			{
+				sprintf(buff, PLUGIN_NAME ".cam%d_vstream_type", i);
+				json_t *value = json_object_get(options, buff);
+				if (value) {
+					if (strcmp(json_string_value(value), "fifo") == 0) {
+						state->options.vstream_type[i] = VIDEO_STREAM_TYPE_FIFO;
+					} else if (strcmp(json_string_value(value), "v4l2") == 0) {
+						state->options.vstream_type[i] = VIDEO_STREAM_TYPE_V4L2;
+					}
+				}
 			}
 		}
 		{
@@ -793,8 +820,18 @@ int main(int argc, char *argv[]) {
 	}
 
 	set_video_mjpeg_xmp_callback(xmp);
-	init_video_mjpeg(0, NULL);
-	init_video_mjpeg(1, NULL);
+	for (int i = 0; i < CAMERA_NUM; i++) {
+		enum VIDEO_STREAM_TYPE type = state->options.vstream_type[i];
+		char filepath[256];
+		if (type == VIDEO_STREAM_TYPE_NONE) {
+			continue;
+		} else if (type == VIDEO_STREAM_TYPE_FIFO) {
+			sprintf(filepath, "cam%d", i);
+		} else if (type == VIDEO_STREAM_TYPE_V4L2) {
+			strncpy(filepath, state->options.v4l2_devicefile[i], sizeof(filepath));
+		}
+		init_video_mjpeg(i, type, filepath, state->options.cam_width[i], state->options.cam_height[i], state->options.cam_fps[i], NULL);
+	}
 	video_mjpeg_set_skip_frame(0, lg_skip_frame);
 	video_mjpeg_set_skip_frame(1, lg_skip_frame);
 

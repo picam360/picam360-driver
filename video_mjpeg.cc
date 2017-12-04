@@ -23,6 +23,7 @@ extern "C" {
 #endif
 
 #include "mrevent.h"
+#include "v4l2_handler.h"
 
 #ifdef __cplusplus
 }
@@ -74,19 +75,31 @@ public:
 class _SENDFRAME_ARG_T {
 public:
 	_SENDFRAME_ARG_T() {
+		vstream_type = VIDEO_STREAM_TYPE_NONE;
+		memset(vstream_filepath, 0, sizeof(vstream_filepath));
 		cam_run = false;
 		cam_num = 0;
+		cam_width = 0;
+		cam_height = 0;
+		cam_fps = 0;
 		skip_frame = 0;
 		framecount = 0;
+		recieved_framecount = 0;
 		fps = 0;
 		frameskip = 0;
 		pthread_mutex_init(&frames_mlock, NULL);
 		mrevent_init(&frame_ready);
 	}
+	enum VIDEO_STREAM_TYPE vstream_type;
+	char vstream_filepath[256];
 	bool cam_run;
 	int cam_num;
+	int cam_width;
+	int cam_height;
+	int cam_fps;
 	int skip_frame;
-	int framecount;
+	unsigned int framecount;
+	unsigned int recieved_framecount;
 	float fps;
 	int frameskip;
 	std::list<_FRAME_T *> frames;
@@ -136,14 +149,11 @@ static void *sendframe_thread_func(void* arg) {
 
 				struct timeval diff;
 				timersub(&time, &last_time, &diff);
-				float diff_sec = (float) diff.tv_sec
-						+ (float) diff.tv_usec / 1000000;
+				float diff_sec = (float) diff.tv_sec + (float) diff.tv_usec / 1000000;
 				if (diff_sec > 1.0) {
-					float tmp = (float) (send_frame_arg->framecount
-							- last_framecount) / diff_sec;
+					float tmp = (float) (send_frame_arg->framecount - last_framecount) / diff_sec;
 					float w = diff_sec / 10;
-					send_frame_arg->fps = send_frame_arg->fps * (1.0 - w)
-							+ tmp * w;
+					send_frame_arg->fps = send_frame_arg->fps * (1.0 - w) + tmp * w;
 
 					last_framecount = send_frame_arg->framecount;
 					last_time = time;
@@ -182,20 +192,19 @@ static void *sendframe_thread_func(void* arg) {
 	return NULL;
 }
 
-static void *camx_thread_func(void* arg) {
+static void *camx_thread_func_fifo(void* arg) {
 	pthread_setname_np(pthread_self(), "CAM");
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
 	char buff[RTP_MAXPAYLOADSIZE];
 	int buff_size = RTP_MAXPAYLOADSIZE;
-	sprintf(buff, "cam%d", send_frame_arg->cam_num);
-	int camd_fd = open(buff, O_RDONLY);
+
+	int camd_fd = open(send_frame_arg->vstream_filepath, O_RDONLY);
 	if (camd_fd < 0) {
 		return NULL;
 	}
 
 	pthread_t sendframe_thread;
-	pthread_create(&sendframe_thread, NULL, sendframe_thread_func,
-			(void*) send_frame_arg);
+	pthread_create(&sendframe_thread, NULL, sendframe_thread_func, (void*) send_frame_arg);
 
 	int stat_ave = 0;
 	int stat_sigma = 0;
@@ -205,7 +214,6 @@ static void *camx_thread_func(void* arg) {
 
 	int marker = 0;
 	int soicount = 0;
-	int framecount = 0;
 	_FRAME_T *active_frame = NULL;
 	while (send_frame_arg->cam_run) {
 		int soi_pos = INT_MIN;
@@ -215,8 +223,7 @@ static void *camx_thread_func(void* arg) {
 			if (marker) {
 				marker = 0;
 				if (buff[i] == 0xD8) { //SOI
-					framecount++;
-					if ((framecount % (send_frame_arg->skip_frame + 1)) != 0) {
+					if ((send_frame_arg->recieved_framecount++ % (send_frame_arg->skip_frame + 1)) != 0) {
 						continue;
 					}
 					if (soicount == 0) {
@@ -238,40 +245,34 @@ static void *camx_thread_func(void* arg) {
 						if (soi_pos >= 0) { //soi
 							packet->len = (i + 1) - soi_pos;
 							if (packet->len > RTP_MAXPAYLOADSIZE) {
-								fprintf(stderr, "packet length exceeded. %d\n",
-										packet->len);
+								fprintf(stderr, "packet length exceeded. %d\n", packet->len);
 								packet->len = RTP_MAXPAYLOADSIZE;
 							}
 							memcpy(packet->data, buff + soi_pos, packet->len);
 						} else {
 							packet->len = i + 1;
 							if (packet->len > RTP_MAXPAYLOADSIZE) {
-								fprintf(stderr, "packet length exceeded. %d\n",
-										packet->len);
+								fprintf(stderr, "packet length exceeded. %d\n", packet->len);
 								packet->len = RTP_MAXPAYLOADSIZE;
 							}
 							memcpy(packet->data, buff, packet->len);
 						}
 
 						{ //stat
-							float num_of_bytes = active_frame->num_of_bytes
-									+ packet->len;
+							float num_of_bytes = active_frame->num_of_bytes + packet->len;
 							stat_n++;
 							stat_ave_sum += num_of_bytes;
 							stat_ave2_sum += num_of_bytes * num_of_bytes;
 							if (stat_n > 100) {
-								float ave = (float) stat_ave_sum
-										/ (float) stat_n;
-								float ave2 = (float) stat_ave2_sum
-										/ (float) stat_n;
+								float ave = (float) stat_ave_sum / (float) stat_n;
+								float ave2 = (float) stat_ave2_sum / (float) stat_n;
 								stat_ave = (int) ave;
 								stat_sigma = (int) sqrt(ave2 - ave * ave);
 								stat_sigma += stat_ave / 15; //offset 1/5
 								stat_n = 100;
 								stat_ave_sum = ave * stat_n;
 								stat_ave2_sum = ave2 * stat_n;
-								if ((float) num_of_bytes
-										> (float) stat_ave * 1.5) {
+								if ((float) num_of_bytes > (float) stat_ave * 1.5) {
 									stat_n = 0;
 									stat_ave_sum = 0;
 									stat_ave2_sum = 0;
@@ -329,15 +330,13 @@ static void *camx_thread_func(void* arg) {
 						}
 					} else {
 						soi_pos += 2; //increment soi marker
-						memcpy(packet->data + 2 + xmp_len, buff + soi_pos,
-								packet->len - 2);
+						memcpy(packet->data + 2 + xmp_len, buff + soi_pos, packet->len - 2);
 						packet->len += xmp_len;
 					}
 				} else {
 					packet->len = data_len - soi_pos;
 					if (packet->len > RTP_MAXPAYLOADSIZE) {
-						fprintf(stderr, "packet length exceeded. %d\n",
-								packet->len);
+						fprintf(stderr, "packet length exceeded. %d\n", packet->len);
 						packet->len = RTP_MAXPAYLOADSIZE;
 					}
 					memcpy(packet->data, buff + soi_pos, packet->len);
@@ -345,8 +344,7 @@ static void *camx_thread_func(void* arg) {
 			} else {
 				packet->len = data_len;
 				if (packet->len > RTP_MAXPAYLOADSIZE) {
-					fprintf(stderr, "packet length exceeded. %d\n",
-							packet->len);
+					fprintf(stderr, "packet length exceeded. %d\n", packet->len);
 					packet->len = RTP_MAXPAYLOADSIZE;
 				}
 				memcpy(packet->data, buff, packet->len);
@@ -363,18 +361,103 @@ static void *camx_thread_func(void* arg) {
 	close(camd_fd);
 	return NULL;
 }
-void init_video_mjpeg(int cam_num, void *user_data) {
+
+static int v4l2_progress_image(const void *p, int size, void* arg) {
+	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
+
+	//remove space
+	for (; size > 0;) {
+		if (((unsigned char*) p)[size - 1] == 0xD9) {
+			break;
+		} else {
+			size--;
+		}
+	}
+
+	if ((send_frame_arg->recieved_framecount++ % (send_frame_arg->skip_frame + 1)) == 0 && size != 0) {
+		_FRAME_T *active_frame = new _FRAME_T;
+
+		pthread_mutex_lock(&send_frame_arg->frames_mlock);
+		send_frame_arg->frames.push_back(active_frame);
+		pthread_mutex_unlock(&send_frame_arg->frames_mlock);
+		mrevent_trigger(&send_frame_arg->frame_ready);
+
+		for (int i = 0; i < size;) {
+			_PACKET_T *packet = new _PACKET_T;
+			if (i == 0) {
+				i += 2; //increment soi marker
+				packet->len = 2;
+				packet->data[0] = 0xFF;
+				packet->data[1] = 0xD8; //soi marker
+				if (lg_video_mjpeg_xmp_callback) { //xmp injection
+					int xmp_len = lg_video_mjpeg_xmp_callback(packet->data + 2,
+					RTP_MAXPAYLOADSIZE - 2, send_frame_arg->cam_num);
+					if (packet->len + xmp_len <= RTP_MAXPAYLOADSIZE) {
+						packet->len += xmp_len;
+					}
+				}
+			}
+			int len;
+			if (packet->len + (size - i) > RTP_MAXPAYLOADSIZE) {
+				len = RTP_MAXPAYLOADSIZE - packet->len;
+			} else {
+				len = (size - i);
+			}
+			if (len) {
+				memcpy(packet->data + packet->len, (unsigned char*) p + i, len);
+				packet->len += len;
+				i += len;
+			}
+			pthread_mutex_lock(&active_frame->packets_mlock);
+			active_frame->num_of_bytes += packet->len;
+			if (i == size) { // active_frame->num_of_bytes is size + xmp_len
+				packet->eof = true;
+			}
+			active_frame->packets.push_back(packet);
+			mrevent_trigger(&active_frame->packet_ready);
+			pthread_mutex_unlock(&active_frame->packets_mlock);
+		}
+	}
+
+	return send_frame_arg->cam_run ? 1 : 0;
+}
+
+static void *camx_thread_func_v4l2(void* arg) {
+	pthread_setname_np(pthread_self(), "CAM");
+	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
+
+	pthread_t sendframe_thread;
+	pthread_create(&sendframe_thread, NULL, sendframe_thread_func, arg);
+
+	handle_v4l2(send_frame_arg->vstream_filepath, send_frame_arg->cam_width, send_frame_arg->cam_height, send_frame_arg->cam_fps, v4l2_progress_image, arg);
+
+	return NULL;
+}
+void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const char *vstream_filepath, int width, int height, int fps, void *user_data) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
 	}
 	lg_send_frame_arg[cam_num] = new _SENDFRAME_ARG_T;
 	lg_send_frame_arg[cam_num]->cam_num = cam_num;
+	lg_send_frame_arg[cam_num]->vstream_type = vstream_type;
+	strncpy(lg_send_frame_arg[cam_num]->vstream_filepath, vstream_filepath, sizeof(lg_send_frame_arg[cam_num]->vstream_filepath));
+	lg_send_frame_arg[cam_num]->cam_width = width;
+	lg_send_frame_arg[cam_num]->cam_height = height;
+	lg_send_frame_arg[cam_num]->cam_fps = fps;
 	lg_send_frame_arg[cam_num]->user_data = user_data;
 
 	lg_send_frame_arg[cam_num]->cam_run = true;
-	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL,
-			camx_thread_func, (void*) lg_send_frame_arg[cam_num]);
+
+	void *(*start_routine)(void *);
+	if (lg_send_frame_arg[cam_num]->vstream_type == VIDEO_STREAM_TYPE_FIFO) {
+		start_routine = camx_thread_func_fifo;
+	} else if (lg_send_frame_arg[cam_num]->vstream_type == VIDEO_STREAM_TYPE_V4L2) {
+		start_routine = camx_thread_func_v4l2;
+	} else {
+		return;
+	}
+	pthread_create(&lg_send_frame_arg[cam_num]->cam_thread, NULL, start_routine, (void*) lg_send_frame_arg[cam_num]);
 }
 void deinit_video_mjpeg(int cam_num) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);

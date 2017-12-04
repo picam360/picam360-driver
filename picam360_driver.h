@@ -5,6 +5,17 @@
 #include "mrevent.h"
 
 #include "picam360_driver_plugin.h"
+#include "video_mjpeg.h"
+
+#define CAMERA_NUM 2
+
+typedef struct _OPTIONS_T {
+	enum VIDEO_STREAM_TYPE vstream_type[CAMERA_NUM];
+	char v4l2_devicefile[CAMERA_NUM][256];
+	int cam_width[CAMERA_NUM];
+	int cam_height[CAMERA_NUM];
+	int cam_fps[CAMERA_NUM];
+} OPTIONS_T;
 
 typedef struct _LIST_T {
 	void *value;
@@ -31,4 +42,5 @@ typedef struct _PICAM360DRIVER_T {
 	STATUS_T **watches;
 	char mpu_type[64];
 	V4l2_CTL_T **v4l2_ctls;
+	OPTIONS_T options;
 } PICAM360DRIVER_T;
