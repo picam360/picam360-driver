@@ -69,12 +69,9 @@ static void *threadFunc(void *data) {
 				}
 				bias[i] = (lg_compass_min[i] + lg_compass_max[i]) / 2;
 				gain[i] = (lg_compass_max[i] - lg_compass_min[i]) / 2;
-				calib[i] = (compass[i] - bias[i])
-						/ (gain[i] == 0 ? 1 : gain[i]);
+				calib[i] = (compass[i] - bias[i]) / (gain[i] == 0 ? 1 : gain[i]);
 			}
-			float norm = sqrt(
-					calib[0] * calib[0] + calib[1] * calib[1]
-							+ calib[2] * calib[2]);
+			float norm = sqrt(calib[0] * calib[0] + calib[1] * calib[1] + calib[2] * calib[2]);
 			for (int i = 0; i < 3; i++) {
 				calib[i] /= (norm == 0 ? 1 : norm);
 			}
@@ -100,8 +97,7 @@ static void *threadFunc(void *data) {
 			float compass_mat[16] = { };
 			memcpy(compass_mat, lg_compass.ary, sizeof(float) * 4);
 			if (lg_debugdump) {
-				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0],
-						compass_mat[1], compass_mat[2]);
+				printf("compass1 %f : %f, %f, %f\n", lg_north, compass_mat[0], compass_mat[1], compass_mat[2]);
 			}
 
 			mat4_transpose(compass_mat, compass_mat);
@@ -109,14 +105,12 @@ static void *threadFunc(void *data) {
 			mat4_transpose(compass_mat, compass_mat);
 
 			if (lg_debugdump) {
-				printf("compass2 %f : %f, %f, %f\n", lg_north, compass_mat[0],
-						compass_mat[1], compass_mat[2]);
+				printf("compass2 %f : %f, %f, %f\n", lg_north, compass_mat[0], compass_mat[1], compass_mat[2]);
 			}
 
 			north = -atan2(compass_mat[0], -compass_mat[2]) * 180 / M_PI; // start from z axis
 
-			lg_north = lg_north
-					+ sub_angle(north, lg_north) / (lg_north_count + 1);
+			lg_north = lg_north + sub_angle(north, lg_north) / (lg_north_count + 1);
 			lg_north_count++;
 			if (lg_north_count > 100) {
 				lg_north_count = 100;
@@ -126,28 +120,21 @@ static void *threadFunc(void *data) {
 			float x, y, z;
 			if (lg_debugdump) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
-						y * 180 / M_PI, z * 180 / M_PI);
+				printf("original %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 			VECTOR4D_T quat_offset = quaternion_init();
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_z(lg_offset_roll));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_x(lg_offset_pitch));
-			quat_offset = quaternion_multiply(quat_offset,
-					quaternion_get_from_y(lg_offset_yaw));
+			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_z(lg_offset_roll));
+			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_x(lg_offset_pitch));
+			quat_offset = quaternion_multiply(quat_offset, quaternion_get_from_y(lg_offset_yaw));
 			quat = quaternion_multiply(quat, quat_offset); // Rv=RvoRv
 			if (lg_debugdump) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
-						y * 180 / M_PI, z * 180 / M_PI);
+				printf("offset   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
-			quat = quaternion_multiply(
-					quaternion_get_from_y(-lg_north * M_PI / 180), quat); // Rv=RvoRvRn
+			quat = quaternion_multiply(quaternion_get_from_y(-lg_north * M_PI / 180), quat); // Rv=RvoRvRn
 			if (lg_debugdump) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI,
-						y * 180 / M_PI, z * 180 / M_PI);
+				printf("north   %f : %f, %f, %f\n", lg_north, x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 		}
 		{ //time
@@ -184,11 +171,9 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	if (status == STATUS_VAR(is_compass_calib)) {
 		snprintf(buff, buff_len, "%d", lg_is_compass_calib ? 1 : 0);
 	} else if (status == STATUS_VAR(compass_min)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_compass_min[0],
-				lg_compass_min[1], lg_compass_min[2]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_compass_min[0], lg_compass_min[1], lg_compass_min[2]);
 	} else if (status == STATUS_VAR(compass_max)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_compass_max[0],
-				lg_compass_max[1], lg_compass_max[2]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
 	}
 }
 
@@ -221,10 +206,13 @@ static void init() {
 	} else {
 		is_init = true;
 	}
+	if (ms_open(lg_i2c_ch) != 0) {
+		//error
+		return;
+	}
+
 	pthread_mutex_init(&lg_mutex, 0);
 	gettimeofday(&lg_base_time, NULL);
-
-	ms_open(lg_i2c_ch);
 
 	init_status();
 
@@ -268,15 +256,13 @@ static int command_handler(void *user_data, const char *_buff) {
 	cmd = strtok(buff, " \n");
 	if (cmd == NULL) {
 		//do nothing
-	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".start_compass_calib", sizeof(buff)) == 0) {
 		lg_is_compass_calib = true;
 		for (int i = 0; i < 3; i++) {
 			lg_compass_min[i] = INT_MAX;
 			lg_compass_max[i] = -INT_MAX;
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".stop_compass_calib", sizeof(buff)) == 0) {
 		lg_is_compass_calib = false;
 	}
 	return 0;
@@ -292,14 +278,10 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 }
 
 static void init_options(void *user_data, json_t *options) {
-	lg_offset_pitch = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".offset_pitch"));
-	lg_offset_yaw = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".offset_yaw"));
-	lg_offset_roll = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".offset_roll"));
-	lg_i2c_ch = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".i2c_ch"));
+	lg_offset_pitch = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_pitch"));
+	lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
+	lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
+	lg_i2c_ch = json_number_value(json_object_get(options, PLUGIN_NAME ".i2c_ch"));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
@@ -313,12 +295,9 @@ static void init_options(void *user_data, json_t *options) {
 }
 
 static void save_options(void *user_data, json_t *options) {
-	json_object_set_new(options, PLUGIN_NAME ".offset_pitch",
-			json_real(lg_offset_pitch));
-	json_object_set_new(options, PLUGIN_NAME ".offset_yaw",
-			json_real(lg_offset_yaw));
-	json_object_set_new(options, PLUGIN_NAME ".offset_roll",
-			json_real(lg_offset_roll));
+	json_object_set_new(options, PLUGIN_NAME ".offset_pitch", json_real(lg_offset_pitch));
+	json_object_set_new(options, PLUGIN_NAME ".offset_yaw", json_real(lg_offset_yaw));
+	json_object_set_new(options, PLUGIN_NAME ".offset_roll", json_real(lg_offset_roll));
 	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
 
 	for (int i = 0; i < 3; i++) {
@@ -335,10 +314,8 @@ static wchar_t lg_info[MAX_INFO_LEN];
 static wchar_t *get_info(void *user_data) {
 	int cur = 0;
 	if (lg_is_compass_calib) {
-		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur,
-				L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]",
-				lg_compass_min[0], lg_compass_min[1], lg_compass_min[2],
-				lg_compass_max[0], lg_compass_max[1], lg_compass_max[2]);
+		cur += swprintf(lg_info + cur, MAX_INFO_LEN - cur, L"\ncompass calib : min[%.1f,%.1f,%.1f] max[%.1f,%.1f,%.1f]", lg_compass_min[0], lg_compass_min[1], lg_compass_min[2], lg_compass_max[0],
+				lg_compass_max[1], lg_compass_max[2]);
 	}
 	return lg_info;
 }
