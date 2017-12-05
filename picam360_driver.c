@@ -502,6 +502,22 @@ static void save_options() {
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].z));
 		sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].w));
+
+		sprintf(buff, PLUGIN_NAME ".cam%d_width", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_width[i]));
+		sprintf(buff, PLUGIN_NAME ".cam%d_height", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_height[i]));
+		sprintf(buff, PLUGIN_NAME ".cam%d_fps", i);
+		json_object_set_new(options, buff, json_real(state->options.cam_fps[i]));
+
+		if (state->options.v4l2_devicefile[i][0] != 0) {
+			sprintf(buff, PLUGIN_NAME ".cam%d_v4l2_devicefile", i);
+			json_object_set_new(options, buff, json_string(state->options.v4l2_devicefile[i]));
+		}
+		if (state->options.v4l2_devicefile[i][0] != 0) {
+			sprintf(buff, PLUGIN_NAME ".cam%d_vstream_type", i);
+			json_object_set_new(options, buff, json_string(state->options.vstream_type[i]));
+		}
 	}
 
 	if (state->plugin_paths) {
