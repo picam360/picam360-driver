@@ -516,7 +516,19 @@ static void save_options() {
 		}
 		if (state->options.v4l2_devicefile[i][0] != 0) {
 			sprintf(buff, PLUGIN_NAME ".cam%d_vstream_type", i);
-			json_object_set_new(options, buff, json_string(state->options.vstream_type[i]));
+
+			const char *type_str = NULL;
+			enum VIDEO_STREAM_TYPE type = state->options.vstream_type[i];
+			if (type == VIDEO_STREAM_TYPE_NONE) {
+				continue;
+			} else if (type == VIDEO_STREAM_TYPE_FIFO) {
+				type_str = "fifo";
+			} else if (type == VIDEO_STREAM_TYPE_V4L2) {
+				type_str = "v4l2";
+			}
+			if (type_str) {
+				json_object_set_new(options, buff, json_string(type_str));
+			}
 		}
 	}
 
