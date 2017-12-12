@@ -14,6 +14,7 @@
     "picam360_driver.cam0_horizon_r": 0.83999842405319214,
     "picam360_driver.cam1_offset_x": 0.0,
     "picam360_driver.cam1_offset_y": -0.029999990016222,
+    "picam360_driver.cam1_offset_yaw": 0.0,
     "plugin_paths": [
         "plugins/mpu9250.so"
     ],
@@ -27,7 +28,16 @@
         "white_balance_temperature" : 2800,
         "exposure_auto" : 3
     },
-    "picam360_driver.cam1_offset_yaw": 0.0,
+    "picam360_driver.cam0_v4l2_devicefile": "/dev/video0",
+    "picam360_driver.cam1_v4l2_devicefile": "/dev/video2",
+    "picam360_driver.cam0_vstream_type": "v4l2",
+    "picam360_driver.cam1_vstream_type": "v4l2",
+    "picam360_driver.cam0_width": 2048,
+    "picam360_driver.cam1_width": 2048,
+    "picam360_driver.cam0_height": 1536,
+    "picam360_driver.cam1_height": 1536,
+    "picam360_driver.cam0_fps": 15,
+    "picam360_driver.cam1_fps": 15,
     "rov_driver.motor2_dir": -1.0,
     "rov_driver.i_gain": 20.0,
     "mpu9250.compass_max_0": 89.0,
