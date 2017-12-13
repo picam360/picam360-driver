@@ -138,7 +138,7 @@ void *pid_thread_func(void* arg) {
 
 	static float last_time = -1;
 	while (1) {
-		usleep(20 * 1000); //less than 50Hz
+		usleep(50 * 1000); //less than 20Hz
 		if (lg_lowlevel_control) {
 			continue;
 		}

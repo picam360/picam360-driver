@@ -87,7 +87,7 @@ fi
 
 sudo killall socat
 socat -u udp-recv:9003 - > rtcp_rx &
-socat PIPE:rtp_tx UDP-DATAGRAM:$CAPTURE_IP:9002 &
+#socat PIPE:rtp_tx UDP-DATAGRAM:$CAPTURE_IP:9002 &
 
 #socat tcp-connect:$CAPTURE_IP:9002 PIPE:rtp_tx &
 

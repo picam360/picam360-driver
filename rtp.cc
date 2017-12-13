@@ -34,7 +34,7 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-//#define USE_SOCKET
+#define USE_SOCKET
 
 #if defined USE_JRTP
 #include "rtpsession.h"
@@ -166,6 +166,31 @@ static RTP_CALLBACK lg_callback = NULL;
 static float lg_bandwidth = 0;
 static float lg_bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 
+#if defined USE_SOCKET
+static char lg_socket_buffer[8 * 1024];
+static int lg_socket_buffer_cur = 0;
+static sockaddr_in lg_addr = {};
+void send_via_socket(int fd, const unsigned char *data, int data_len) {
+	for (int i = 0; i < data_len;) {
+		int buffer_space = sizeof(lg_socket_buffer) - lg_socket_buffer_cur;
+		if (buffer_space < (data_len - i)) {
+			memcpy(lg_socket_buffer + lg_socket_buffer_cur, data + i, buffer_space);
+			lg_socket_buffer_cur = 0;
+			i += buffer_space;
+
+			int sendsize = sendto(fd, lg_socket_buffer, sizeof(lg_socket_buffer), 0, (struct sockaddr *) &lg_addr, sizeof(lg_addr));
+			if (sendsize != sizeof(lg_socket_buffer)) {
+				perror("sendto() failed.");
+			}
+		} else {
+			memcpy(lg_socket_buffer + lg_socket_buffer_cur, data + i, data_len - i);
+			lg_socket_buffer_cur += data_len - i;
+			i = data_len;
+		}
+	}
+}
+#endif
+
 void rtp_set_callback(RTP_CALLBACK callback) {
 	lg_callback = callback;
 }
@@ -213,17 +238,29 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 #ifdef USE_JRTP
 		int status = lg_sess.SendPacket(data, data_len, pt, false, diff_usec);
 		checkerror(status);
-#elif defined USE_SOCKET
 #else
 		if (lg_tx_fd < 0) {
+#if defined USE_SOCKET
+			lg_tx_fd = socket(AF_INET, SOCK_DGRAM, 0);
+#else
 			lg_tx_fd = open("rtp_tx", O_WRONLY);
+#endif
 		}
 		if (lg_tx_fd >= 0) {
+
+			lg_seqnr++;
+			lg_timestamp += diff_usec;
+
+			RTPPacket *pack = new RTPPacket(sizeof(RTPHeader));
+			pack->seqnr = lg_seqnr;
+			pack->timestamp = lg_timestamp;
+			pack->payloadtype = pt;
+			pack->StoreHeader();
+
 			unsigned char header[8];
+			unsigned short len = sizeof(header) + sizeof(struct RTPHeader) + data_len;
 			header[0] = 0xFF;
 			header[1] = 0xE1;
-			unsigned short len = sizeof(header) + sizeof(struct RTPHeader)
-					+ data_len;
 			for (int i = 0; i < 2; i++) {
 				header[2 + i] = (len >> (8 * i)) & 0xFF;
 			}
@@ -231,18 +268,16 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 			header[5] = (unsigned char) 't';
 			header[6] = (unsigned char) 'p';
 			header[7] = (unsigned char) '\0';
+
+#if defined USE_SOCKET
+			send_via_socket(lg_tx_fd, header, sizeof(header));
+			send_via_socket(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
+			send_via_socket(lg_tx_fd, data, data_len);
+#else
 			write(lg_tx_fd, header, sizeof(header));
-
-			lg_seqnr++;
-			lg_timestamp += diff_usec;
-
-			RTPPacket *pack = new RTPPacket(sizeof(struct RTPHeader));
-			pack->seqnr = lg_seqnr;
-			pack->timestamp = lg_timestamp;
-			pack->payloadtype = pt;
-			pack->StoreHeader();
 			write(lg_tx_fd, pack->GetPacketData(), pack->GetPacketLength());
 			write(lg_tx_fd, data, data_len);
+#endif
 			delete pack;
 		}
 #endif
@@ -277,8 +312,7 @@ static void *buffering_thread_func(void* arg) {
 	while (lg_receive_run) {
 		int size = 4 * 1024;
 		RTPPacket *raw_pack = new RTPPacket(size);
-		raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(),
-				raw_pack->GetPacketLength());
+		raw_pack->packetlength = read(rx_fd, raw_pack->GetPacketData(), raw_pack->GetPacketLength());
 		if (raw_pack->packetlength <= 0) {
 			delete raw_pack;
 			continue;
@@ -393,16 +427,12 @@ static void *receive_thread_func(void* arg) {
 						pack = new RTPPacket(xmp_len - 8);
 					}
 					if (i + (xmp_len - xmp_pos) <= data_len) {
-						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
-								xmp_len - xmp_pos);
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i], xmp_len - xmp_pos);
 						i += xmp_len - xmp_pos - 1;
 						xmp_pos = xmp_len;
 						pack->LoadHeader();
 						if (lg_callback && lg_load_fd < 0) {
-							lg_callback(pack->GetPayloadData(),
-									pack->GetPayloadLength(),
-									pack->GetPayloadType(),
-									pack->GetSequenceNumber());
+							lg_callback(pack->GetPayloadData(), pack->GetPayloadLength(), pack->GetPayloadType(), pack->GetSequenceNumber());
 						}
 						if (lg_record_fd > 0) {
 							pthread_mutex_lock(&lg_record_packet_queue_mlock);
@@ -416,8 +446,7 @@ static void *receive_thread_func(void* arg) {
 						xmp = false;
 					} else {
 						int rest_in_buff = data_len - i;
-						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i],
-								rest_in_buff);
+						memcpy(pack->GetPacketData() + xmp_pos - 8, &buff[i], rest_in_buff);
 						i = data_len - 1;
 						xmp_pos += rest_in_buff;
 					}
@@ -526,9 +555,7 @@ static void *load_thread_func(void* arg) {
 				break;
 			}
 		}
-		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1
-				|| buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p'
-				|| buff[7] != '\0') {
+		if (read_len != 8 || buff[0] != 0xFF || buff[1] != 0xE1 || buff[4] != 'r' || buff[5] != 't' || buff[6] != 'p' || buff[7] != '\0') {
 			//error
 			ret = -1;
 			perror("rtp error\n");
@@ -590,9 +617,7 @@ static void *load_thread_func(void* arg) {
 		}
 
 		if (lg_callback) {
-			lg_callback(buff + sizeof(struct RTPHeader),
-					len - sizeof(struct RTPHeader), header->payloadtype,
-					ntohs(header->sequencenumber));
+			lg_callback(buff + sizeof(struct RTPHeader), len - sizeof(struct RTPHeader), header->payloadtype, ntohs(header->sequencenumber));
 		}
 	}
 	if (callback) {
@@ -602,8 +627,7 @@ static void *load_thread_func(void* arg) {
 }
 
 static bool is_init = false;
-int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
-		float bandwidth_limit) {
+int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport, float bandwidth_limit) {
 	if (is_init) {
 		return -1;
 	}
@@ -644,8 +668,14 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
 	status = lg_sess.AddDestination(addr);
 	checkerror(status);
 #else
-	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func,
-			(void*) NULL);
+
+#if defined USE_SOCKET
+	lg_addr.sin_family = AF_INET;
+	lg_addr.sin_port = htons(9002);
+	lg_addr.sin_addr.s_addr = inet_addr("192.168.4.2");
+#endif
+
+	pthread_create(&lg_buffering_thread, NULL, buffering_thread_func, (void*) NULL);
 	mrevent_init(&lg_buffering_ready);
 #endif
 
@@ -699,8 +729,7 @@ bool rtp_is_recording(char **path) {
 	return (lg_record_fd > 0);
 }
 
-bool rtp_start_loading(char *path, bool auto_play, bool is_looping,
-		RTP_LOADING_CALLBACK callback, void *user_data) {
+bool rtp_start_loading(char *path, bool auto_play, bool is_looping, RTP_LOADING_CALLBACK callback, void *user_data) {
 	rtp_stop_loading();
 	strcpy(lg_load_path, path);
 	lg_auto_play = auto_play;
