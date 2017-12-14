@@ -35,6 +35,7 @@ extern "C" {
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define USE_SOCKET
+#define USE_SOCKET_TCP
 
 #if defined USE_JRTP
 #include "rtpsession.h"
@@ -169,7 +170,8 @@ static float lg_bandwidth_limit = 100 * 1024 * 1024; //100Mbps
 #if defined USE_SOCKET
 static char lg_socket_buffer[8 * 1024];
 static int lg_socket_buffer_cur = 0;
-static sockaddr_in lg_addr = {};
+static sockaddr_in lg_addr = { };
+static pthread_t lg_listen_thread;
 void send_via_socket(int fd, const unsigned char *data, int data_len) {
 	for (int i = 0; i < data_len;) {
 		int buffer_space = sizeof(lg_socket_buffer) - lg_socket_buffer_cur;
@@ -240,7 +242,8 @@ int rtp_sendpacket(unsigned char *data, int data_len, int pt) {
 		checkerror(status);
 #else
 		if (lg_tx_fd < 0) {
-#if defined USE_SOCKET
+#if defined USE_SOCKET_TCP
+#elif defined USE_SOCKET
 			lg_tx_fd = socket(AF_INET, SOCK_DGRAM, 0);
 #else
 			lg_tx_fd = open("rtp_tx", O_WRONLY);
@@ -625,6 +628,28 @@ static void *load_thread_func(void* arg) {
 	}
 	return NULL;
 }
+#if defined USE_SOCKET_TCP
+static void *tcp_listening_thread_func(void* arg) {
+	sockaddr_in client_addr = { };
+	socklen_t client_addr_size = sizeof(client_addr);
+
+	lg_addr.sin_family = AF_INET;
+	lg_addr.sin_port = htons(9002);
+	lg_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	int srv_fd = socket(AF_INET, SOCK_STREAM, 0);
+	int status = bind(srv_fd, (struct sockaddr*) &lg_addr, sizeof(lg_addr));
+	if (status < 0) {
+		perror("bind() failed.");
+	}
+	listen(srv_fd, 1);
+	printf("Waiting for connection ...\n");
+	lg_tx_fd = accept(srv_fd, (struct sockaddr *) &client_addr, &client_addr_size);
+	printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
+
+	return NULL;
+}
+#endif
 
 static bool is_init = false;
 int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport, float bandwidth_limit) {
@@ -669,7 +694,9 @@ int init_rtp(unsigned short portbase, char *destip_str, unsigned short destport,
 	checkerror(status);
 #else
 
-#if defined USE_SOCKET
+#if defined USE_SOCKET_TCP
+	pthread_create(&lg_listen_thread, NULL, tcp_listening_thread_func, (void*) NULL);
+#elif defined USE_SOCKET
 	lg_addr.sin_family = AF_INET;
 	lg_addr.sin_port = htons(9002);
 	lg_addr.sin_addr.s_addr = inet_addr("192.168.4.2");
