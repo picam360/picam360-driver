@@ -35,12 +35,6 @@ do
     esac
 done
 
-if [ -e cmd ]; then
-	rm cmd
-fi
-mkfifo cmd
-chmod 0666 cmd
-
 if [ -e cam0 ]; then
 	rm cam0
 fi
@@ -52,44 +46,6 @@ if [ -e cam1 ]; then
 fi
 mkfifo cam1
 chmod 0666 cam1
-
-if [ -e rtp_rx ]; then
-	rm rtp_rx
-fi
-mkfifo rtp_rx
-chmod 0666 rtp_rx
-
-if [ -e rtp_tx ]; then
-	rm rtp_tx
-fi
-mkfifo rtp_tx
-chmod 0666 rtp_tx
-
-if [ -e rtcp_rx ]; then
-	rm rtcp_rx
-fi
-mkfifo rtcp_rx
-chmod 0666 rtcp_rx
-
-if [ -e rtcp_tx ]; then
-	rm rtcp_tx
-fi
-mkfifo rtcp_tx
-chmod 0666 rtcp_tx
-
-if [ "$CAPTURE_IP" = "" ]; then
-	CAPTURE_IP="192.168.4.2"
-fi
-
-#use tcp
-#	sudo killall nc
-#   nc -l -p 9006 < rtp_tx > rtp_rx &
-
-sudo killall socat
-socat -u udp-recv:9003 - > rtcp_rx &
-#socat PIPE:rtp_tx UDP-DATAGRAM:$CAPTURE_IP:9002 &
-
-#socat tcp-connect:$CAPTURE_IP:9002 PIPE:rtp_tx &
 
 if [ $TYPE = "RASPI" ]; then
 

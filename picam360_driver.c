@@ -20,8 +20,6 @@
 
 #include "picam360_driver.h"
 
-#include "rtp.h"
-#include "rtcp.h"
 #include "video_mjpeg.h"
 #include "quaternion.h"
 #include "manual_mpu.h"
@@ -354,10 +352,10 @@ static void init_status() {
 #endif //status block
 
 static void _init_rtp(PICAM360DRIVER_T *state) {
-	state->rtp = create_rtp(9004, RTP_SOCKET_TYPE_UDP, "192.168.4.2", 9002, RTP_SOCKET_TYPE_TCP, 0);
+	state->rtp = create_rtp(0, RTP_SOCKET_TYPE_NONE, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
 	//rtp_set_callback((RTP_CALLBACK) rtp_callback);
-	init_rtcp(9005, "192.168.4.2", 9003, 0);
-	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
+	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, "", 0, RTP_SOCKET_TYPE_NONE, 0);
+	rtp_set_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback);
 
 	init_status();
 }
@@ -416,6 +414,30 @@ static void init_options(PICAM360DRIVER_T *state) {
 					}
 				}
 			}
+		}
+		{ //rtp
+			state->options.rtp_rx_port = json_number_value(json_object_get(options, "rtp_rx_port"));
+			state->options.rtp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_rx_type")));
+			json_t *value = json_object_get(options, "rtp_tx_ip");
+			if (value) {
+				strncpy(state->options.rtp_tx_ip, json_string_value(value), sizeof(state->options.rtp_tx_ip) - 1);
+			} else {
+				memset(state->options.rtp_tx_ip, 0, sizeof(state->options.rtp_tx_ip));
+			}
+			state->options.rtp_tx_port = json_number_value(json_object_get(options, "rtp_tx_port"));
+			state->options.rtp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtp_tx_type")));
+		}
+		{ //rtcp
+			state->options.rtcp_rx_port = json_number_value(json_object_get(options, "rtcp_rx_port"));
+			state->options.rtcp_rx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_rx_type")));
+			json_t *value = json_object_get(options, "rtcp_tx_ip");
+			if (value) {
+				strncpy(state->options.rtcp_tx_ip, json_string_value(value), sizeof(state->options.rtcp_tx_ip) - 1);
+			} else {
+				memset(state->options.rtcp_tx_ip, 0, sizeof(state->options.rtcp_tx_ip));
+			}
+			state->options.rtcp_tx_port = json_number_value(json_object_get(options, "rtcp_tx_port"));
+			state->options.rtcp_tx_type = rtp_get_rtp_socket_type(json_string_value(json_object_get(options, "rtcp_tx_type")));
 		}
 		{
 			json_t *plugin_paths = json_object_get(options, "plugin_paths");
@@ -530,6 +552,20 @@ static void save_options(PICAM360DRIVER_T *state) {
 				json_object_set_new(options, buff, json_string(type_str));
 			}
 		}
+	}
+	{ //rtp
+		json_object_set_new(options, "rtp_rx_port", json_real(state->options.rtp_rx_port));
+		json_object_set_new(options, "rtp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_rx_type)));
+		json_object_set_new(options, "rtp_tx_ip", json_string(state->options.rtp_tx_ip));
+		json_object_set_new(options, "rtp_tx_port", json_real(state->options.rtp_tx_port));
+		json_object_set_new(options, "rtp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtp_tx_type)));
+	}
+	{ //rtcp
+		json_object_set_new(options, "rtcp_rx_port", json_real(state->options.rtcp_rx_port));
+		json_object_set_new(options, "rtcp_rx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_rx_type)));
+		json_object_set_new(options, "rtcp_tx_ip", json_string(state->options.rtcp_tx_ip));
+		json_object_set_new(options, "rtcp_tx_port", json_real(state->options.rtcp_tx_port));
+		json_object_set_new(options, "rtcp_tx_type", json_string(rtp_get_rtp_socket_type_str(state->options.rtcp_tx_type)));
 	}
 
 	if (state->plugin_paths) {

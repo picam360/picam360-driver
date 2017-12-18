@@ -16,6 +16,18 @@ typedef struct _OPTIONS_T {
 	int cam_width[CAMERA_NUM];
 	int cam_height[CAMERA_NUM];
 	int cam_fps[CAMERA_NUM];
+
+	int rtp_rx_port;
+	enum RTP_SOCKET_TYPE rtp_rx_type;
+	char rtp_tx_ip[256];
+	int rtp_tx_port;
+	enum RTP_SOCKET_TYPE rtp_tx_type;
+
+	int rtcp_rx_port;
+	enum RTP_SOCKET_TYPE rtcp_rx_type;
+	char rtcp_tx_ip[256];
+	int rtcp_tx_port;
+	enum RTP_SOCKET_TYPE rtcp_tx_type;
 } OPTIONS_T;
 
 typedef struct _LIST_T {
