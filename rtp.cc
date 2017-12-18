@@ -169,9 +169,11 @@ int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_le
 			_this->tx_buffer_cur += buffer_space;
 			i += buffer_space;
 
-			int sendsize = sendto(fd, _this->tx_buffer, _this->tx_buffer_cur, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+			int size = _this->tx_buffer_cur;
 			_this->tx_buffer_cur = 0;
-			if (sendsize != _this->tx_buffer_cur) {
+
+			int actsize = sendto(fd, _this->tx_buffer, size, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+			if (actsize != size) {
 				perror("sendto() failed.");
 				return -1;
 			}
@@ -182,9 +184,11 @@ int send_via_socket(RTP_T *_this, int fd, const unsigned char *data, int data_le
 		}
 	}
 	if (flush && _this->tx_buffer_cur > 0) {
-		int sendsize = sendto(fd, _this->tx_buffer, _this->tx_buffer_cur, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+		int size = _this->tx_buffer_cur;
 		_this->tx_buffer_cur = 0;
-		if (sendsize != _this->tx_buffer_cur) {
+
+		int actsize = sendto(fd, _this->tx_buffer, size, 0, (struct sockaddr *) &_this->tx_addr, sizeof(_this->tx_addr));
+		if (actsize != size) {
 			perror("sendto() failed.");
 			return -1;
 		}
@@ -733,19 +737,13 @@ static void *load_thread_func(void* arg) {
 	return NULL;
 }
 
-RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, int rx_buffer_size, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, int tx_buffer_size,
-		float bandwidth_limit) {
+RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
 	RTP_T *_this = new RTP_T;
 
+	rtp_set_buffer_size(_this->rx_buffer_size, _this->tx_buffer_size);
+
 	_this->rx_socket_type = rx_socket_type;
-	if (rx_buffer_size > 0) {
-		_this->rx_buffer_size = rx_buffer_size;
-	}
 	_this->tx_socket_type = tx_socket_type;
-	if (tx_buffer_size > 0) {
-		_this->tx_buffer_size = tx_buffer_size;
-	}
-	_this->tx_buffer = (char*) malloc(_this->tx_buffer_size);
 	_this->bandwidth_limit = bandwidth_limit;
 	_this->receive_run = true;
 
@@ -768,6 +766,16 @@ RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, 
 	mrevent_init(&_this->play_time_updated);
 
 	return _this;
+}
+
+int rtp_set_buffer_size(RTP_T *_this, int rx_buffer_size, int tx_buffer_size) {
+	_this->rx_buffer_size = rx_buffer_size;
+	_this->tx_buffer_size = tx_buffer_size;
+	if (_this->tx_buffer) {
+		free(_this->tx_buffer);
+		_this->tx_buffer = NULL;
+	}
+	_this->tx_buffer = (char*) malloc(_this->tx_buffer_size);
 }
 
 int delete_rtp(RTP_T **_this_p) {

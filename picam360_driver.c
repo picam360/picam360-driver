@@ -352,9 +352,9 @@ static void init_status() {
 #endif //status block
 
 static void _init_rtp(PICAM360DRIVER_T *state) {
-	state->rtp = create_rtp(0, RTP_SOCKET_TYPE_NONE, 0, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 16 * 1024, 0);
+	state->rtp = create_rtp(0, RTP_SOCKET_TYPE_NONE, state->options.rtp_tx_ip, state->options.rtp_tx_port, state->options.rtp_tx_type, 0);
 	//rtp_set_callback((RTP_CALLBACK) rtp_callback);
-	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, 64, "", 0, RTP_SOCKET_TYPE_NONE, 0, 0);
+	state->rtcp = create_rtp(state->options.rtcp_rx_port, state->options.rtcp_rx_type, "", 0, RTP_SOCKET_TYPE_NONE, 0);
 	rtp_set_callback(state->rtcp, (RTP_CALLBACK) rtcp_callback);
 
 	init_status();
