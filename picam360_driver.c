@@ -50,8 +50,8 @@ static VECTOR4D_T lg_quaternion_queue[MAX_DELAY_COUNT] = { };
 static int lg_skip_frame = 0;
 static int lg_ack_command_id = 0;
 
-static void init_options();
-static void save_options();
+static void init_options(PICAM360DRIVER_T *state);
+static void save_options(PICAM360DRIVER_T *state);
 
 static void set_v4l2_ctl(const char *name, const int value) {
 	for (int i = 0; i < CAMERA_NUM; i++) {
@@ -179,7 +179,7 @@ static int _command_handler(const char *_buff) {
 			printf("add_v4l2_ctl : completed\n");
 		}
 	} else if (strncmp(cmd, "save", sizeof(buff)) == 0) {
-		save_options();
+		save_options(state);
 		printf("save : completed\n");
 	} else {
 		printf(":unknown command : %s\n", buff);
@@ -251,7 +251,7 @@ static void *transmit_thread_func(void* arg) {
 				char buff[256];
 				int len = snprintf(buff, sizeof(buff), "<picam360:status name=\"%s\" value=\"%s\" />", state->statuses[i]->name, value);
 				if (cur != 0 && cur + len > RTP_MAXPAYLOADSIZE) {
-					rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+					rtp_sendpacket(state->rtp, (unsigned char*) statuses, cur, PT_STATUS);
 					cur = 0;
 				} else {
 					strncpy(statuses + cur, buff, len);
@@ -259,7 +259,7 @@ static void *transmit_thread_func(void* arg) {
 				}
 			}
 			if (cur != 0) {
-				rtp_sendpacket((unsigned char*) statuses, cur, PT_STATUS);
+				rtp_sendpacket(state->rtp, (unsigned char*) statuses, cur, PT_STATUS);
 			}
 		}
 		usleep(10 * 1000); //less than 100Hz
@@ -319,7 +319,7 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(temperature)) {
 		snprintf(buff, buff_len, "%f", state->plugin_host.get_temperature());
 	} else if (status == STATUS_VAR(bandwidth)) {
-		snprintf(buff, buff_len, "%f", rtp_get_bandwidth());
+		snprintf(buff, buff_len, "%f", rtp_get_bandwidth(state->rtp));
 	} else if (status == STATUS_VAR(cam_fps)) {
 		snprintf(buff, buff_len, "%f,%f", video_mjpeg_get_fps(0), video_mjpeg_get_fps(1));
 	} else if (status == STATUS_VAR(cam_frameskip)) {
@@ -353,8 +353,8 @@ static void init_status() {
 
 #endif //status block
 
-static void _init_rtp() {
-	init_rtp(9004, RTP_SOCKET_TYPE_UDP, "192.168.4.2", 9002, RTP_SOCKET_TYPE_TCP, 0);
+static void _init_rtp(PICAM360DRIVER_T *state) {
+	state->rtp = create_rtp(9004, RTP_SOCKET_TYPE_UDP, "192.168.4.2", 9002, RTP_SOCKET_TYPE_TCP, 0);
 	//rtp_set_callback((RTP_CALLBACK) rtp_callback);
 	init_rtcp(9005, "192.168.4.2", 9003, 0);
 	rtcp_set_callback((RTCP_CALLBACK) rtcp_callback);
@@ -367,7 +367,7 @@ static void _init_rtp() {
 ///////////////////////////////////////////
 #if (1) //plugin host methods
 
-static void init_options() {
+static void init_options(PICAM360DRIVER_T *state) {
 	json_error_t error;
 	json_t *options = json_load_file(CONFIG_FILE, 0, &error);
 	if (options == NULL) {
@@ -486,7 +486,7 @@ static void init_options() {
 	}
 }
 
-static void save_options() {
+static void save_options(PICAM360DRIVER_T *state) {
 	json_t *options = json_object();
 
 	json_object_set_new(options, PLUGIN_NAME ".skip_frame", json_real(lg_skip_frame));
@@ -835,10 +835,10 @@ int main(int argc, char *argv[]) {
 	init_plugins(state);
 
 //init options
-	init_options();
+	init_options(state);
 
 //init rtp
-	_init_rtp();
+	_init_rtp(state);
 
 //set mpu
 	for (int i = 0; state->mpus[i] != NULL; i++) {
@@ -858,7 +858,7 @@ int main(int argc, char *argv[]) {
 		} else if (type == VIDEO_STREAM_TYPE_V4L2) {
 			strncpy(filepath, state->options.v4l2_devicefile[i], sizeof(filepath));
 		}
-		init_video_mjpeg(i, type, filepath, state->options.cam_width[i], state->options.cam_height[i], state->options.cam_fps[i], NULL);
+		init_video_mjpeg(i, type, filepath, state->options.cam_width[i], state->options.cam_height[i], state->options.cam_fps[i], state->rtp, NULL);
 	}
 	video_mjpeg_set_skip_frame(0, lg_skip_frame);
 	video_mjpeg_set_skip_frame(1, lg_skip_frame);

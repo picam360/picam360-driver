@@ -82,6 +82,7 @@ public:
 		cam_width = 0;
 		cam_height = 0;
 		cam_fps = 0;
+		rtp = NULL;
 		skip_frame = 0;
 		framecount = 0;
 		recieved_framecount = 0;
@@ -97,6 +98,7 @@ public:
 	int cam_width;
 	int cam_height;
 	int cam_fps;
+	RTP_T *rtp;
 	int skip_frame;
 	unsigned int framecount;
 	unsigned int recieved_framecount;
@@ -178,7 +180,7 @@ static void *sendframe_thread_func(void* arg) {
 				continue;
 			}
 			// send the packet
-			rtp_sendpacket((unsigned char*) packet->data, packet->len,
+			rtp_sendpacket(send_frame_arg->rtp, (unsigned char*) packet->data, packet->len,
 			PT_CAM_BASE + send_frame_arg->cam_num);
 			if (packet->eof) {
 				delete packet;
@@ -433,7 +435,7 @@ static void *camx_thread_func_v4l2(void* arg) {
 
 	return NULL;
 }
-void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const char *vstream_filepath, int width, int height, int fps, void *user_data) {
+void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const char *vstream_filepath, int width, int height, int fps, RTP_T *rtp, void *user_data) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
 		return;
@@ -445,6 +447,7 @@ void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const ch
 	lg_send_frame_arg[cam_num]->cam_width = width;
 	lg_send_frame_arg[cam_num]->cam_height = height;
 	lg_send_frame_arg[cam_num]->cam_fps = fps;
+	lg_send_frame_arg[cam_num]->rtp = rtp;
 	lg_send_frame_arg[cam_num]->user_data = user_data;
 
 	lg_send_frame_arg[cam_num]->cam_run = true;

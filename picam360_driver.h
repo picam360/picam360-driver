@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include "mrevent.h"
+#include "rtp.h"
 
 #include "picam360_driver_plugin.h"
 #include "video_mjpeg.h"
@@ -33,6 +34,9 @@ typedef struct _PICAM360DRIVER_T {
 
 	pthread_mutex_t cmd_list_mutex;
 	LIST_T *cmd_list;
+
+	RTP_T *rtp;
+	RTP_T *rtcp;
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;
