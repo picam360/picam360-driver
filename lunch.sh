@@ -5,7 +5,6 @@ source ~/.picam360rc
 CURRENT=$(cd $(dirname $0) && pwd)
 cd $CURRENT
 
-CAM_NUM=1
 CAM_WIDTH=2048
 CAM_HEIGHT=2048
 #[RASPI,USB,V4L2]
@@ -18,7 +17,7 @@ DEBUG=false
 while getopts n:w:h:t:v:g OPT
 do
     case $OPT in
-        n)  CAM_NUM=$OPTARG
+        n)  NUM_OF_CAMERA=$OPTARG
             ;;
         w)  CAM_WIDTH=$OPTARG
             ;;
@@ -56,7 +55,7 @@ sudo killall raspivid
 #/usr/bin/raspivid -ih -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 30 -cs $CAM0 -b 2000000 -o - > cam0 &
 #/usr/bin/raspivid -cd MJPEG -n -t 0 -ex sports -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM0 -b 8000000 -o - > cam0 &
 
-if [ $CAM_NUM = "2" ]; then
+if [ $NUM_OF_CAMERA = "2" ]; then
 
 # cam1
 /usr/bin/raspivid -cd MJPEG -n -t 0 -co 20 -w $CAM_WIDTH -h $CAM_HEIGHT -fps 5 -cs $CAM1 -b 8000000 -o - > cam1 &
@@ -71,10 +70,17 @@ CAM_RESOLUTION=${CAM_WIDTH}x${CAM_HEIGHT}
 
 ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0 2> /dev/null &
 
-if [ $CAM_NUM = "2" ]; then
+if [ $NUM_OF_CAMERA = "2" ]; then
 
 ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video2 -vcodec copy pipe:1.mjpeg > cam1 2> /dev/null &
 
+fi
+
+elif [ $TYPE = "V4L2" ]; then
+
+./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video0
+if [ $NUM_OF_CAMERA = "2" ]; then
+./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video2
 fi
 
 fi

@@ -16,7 +16,7 @@ INCLUDES+=-I$(SDKSTAGE)/opt/vc/include/ -I$(SDKSTAGE)/opt/vc/include/interface/v
 		-I$(SDKSTAGE)/opt/vc/include/interface/vmcs_host/linux -I./ -I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/ilclient \
 		-I$(SDKSTAGE)/opt/vc/src/hello_pi/libs/vgfont -I./include -I./libs/MotionSensor
 
-all: $(BIN) $(LIB) $(PLUGINS)
+all: $(BIN) $(LIB) $(PLUGINS) $(TOOLS)
 
 %.o: %.c
 	@rm -f $@ 
@@ -35,11 +35,15 @@ all: $(BIN) $(LIB) $(PLUGINS)
 $(PLUGINS):
 	$(MAKE) -C $@
 
+$(TOOLS):
+	$(MAKE) -C $@
+
 clean:
 	for i in $(OBJS); do (if test -e "$$i"; then ( rm $$i ); fi ); done
 	for i in $(PLUGINS); do (if test -e "$$i"; then ( make -C $$i clean ); fi ); done
+	for i in $(TOOLS); do (if test -e "$$i"; then ( make -C $$i clean ); fi ); done
 	@rm -f $(BIN) $(LIB)
 
 .PRECIOUS: $(OBJS)
-.PHONY: all $(PLUGINS)
+.PHONY: all $(PLUGINS) $(TOOLS)
 

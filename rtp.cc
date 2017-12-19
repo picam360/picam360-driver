@@ -740,7 +740,7 @@ static void *load_thread_func(void* arg) {
 RTP_T *create_rtp(unsigned short portbase, enum RTP_SOCKET_TYPE rx_socket_type, char *destip_str, unsigned short destport, enum RTP_SOCKET_TYPE tx_socket_type, float bandwidth_limit) {
 	RTP_T *_this = new RTP_T;
 
-	rtp_set_buffer_size(_this->rx_buffer_size, _this->tx_buffer_size);
+	rtp_set_buffer_size(_this, _this->rx_buffer_size, _this->tx_buffer_size);
 
 	_this->rx_socket_type = rx_socket_type;
 	_this->tx_socket_type = tx_socket_type;
@@ -776,6 +776,7 @@ int rtp_set_buffer_size(RTP_T *_this, int rx_buffer_size, int tx_buffer_size) {
 		_this->tx_buffer = NULL;
 	}
 	_this->tx_buffer = (char*) malloc(_this->tx_buffer_size);
+	return 0;
 }
 
 int delete_rtp(RTP_T **_this_p) {
