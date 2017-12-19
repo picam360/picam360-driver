@@ -27,6 +27,7 @@ static struct timeval lg_base_time = { };
 
 static int lg_i2c_ch = 1;
 
+static int lg_average_count = 1;
 static bool lg_is_compass_calib = false;
 static float lg_compass_min[3] = { -317.000000, -416.000000, -208.000000 };
 //static float lg_compass_min[3] = { INT_MAX, INT_MAX, INT_MAX };
@@ -55,7 +56,16 @@ static void *threadFunc(void *data) {
 	pthread_setname_np(pthread_self(), "MPU9250");
 
 	do {
-		ms_update();
+		float _quaternion[4] = { };
+		for (int i = 0; i < lg_average_count; i++) {
+			ms_update();
+			for (int j = 0; j < 4; j++) {
+				_quaternion[j] += quaternion[j];
+			}
+		}
+		for (int j = 0; j < 4; j++) {
+			_quaternion[j] /= lg_average_count;
+		}
 
 		VECTOR4D_T quat = { };
 		{ //compas : calibration
@@ -82,10 +92,10 @@ static void *threadFunc(void *data) {
 			lg_compass.ary[3] = 1.0;
 		}
 		{ //quat : convert from mpu coodinate to opengl coodinate
-			quat.ary[0] = quaternion[1];	//x
-			quat.ary[1] = quaternion[3];	//y : swap y and z
-			quat.ary[2] = -quaternion[2];	//z : swap y and z
-			quat.ary[3] = quaternion[0];	//w
+			quat.ary[0] = _quaternion[1];	//x
+			quat.ary[1] = _quaternion[3];	//y : swap y and z
+			quat.ary[2] = -_quaternion[2];	//z : swap y and z
+			quat.ary[3] = _quaternion[0];	//w
 		}
 		{ //north
 			float north = 0;
@@ -282,6 +292,10 @@ static void init_options(void *user_data, json_t *options) {
 	lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
 	lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
 	lg_i2c_ch = json_number_value(json_object_get(options, PLUGIN_NAME ".i2c_ch"));
+	lg_average_count = json_number_value(json_object_get(options, PLUGIN_NAME ".average_count"));
+	if (lg_average_count <= 0) {
+		lg_average_count = 1;
+	}
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
@@ -299,6 +313,7 @@ static void save_options(void *user_data, json_t *options) {
 	json_object_set_new(options, PLUGIN_NAME ".offset_yaw", json_real(lg_offset_yaw));
 	json_object_set_new(options, PLUGIN_NAME ".offset_roll", json_real(lg_offset_roll));
 	json_object_set_new(options, PLUGIN_NAME ".i2c_ch", json_real(lg_i2c_ch));
+	json_object_set_new(options, PLUGIN_NAME ".average_count", json_real(lg_average_count));
 
 	for (int i = 0; i < 3; i++) {
 		char buff[256];
