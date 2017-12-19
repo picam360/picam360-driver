@@ -7,7 +7,6 @@
  * see https://linuxtv.org/docs.php for more information
  */
 //based on https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/capture.c.html
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -276,7 +275,7 @@ static void init_device(PARAMS_T *params) {
 	fmt.fmt.pix.width = params->width;
 	fmt.fmt.pix.height = params->height;
 	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+	fmt.fmt.pix.field = V4L2_FIELD_NONE;
 
 	if (-1 == xioctl(params->fd, VIDIOC_S_FMT, &fmt))
 		errno_exit("VIDIOC_S_FMT");
@@ -310,29 +309,30 @@ static void close_device(PARAMS_T *params) {
 	params->fd = -1;
 }
 
-static void open_device(PARAMS_T *params) {
+static int open_device(PARAMS_T *params) {
 	struct stat st;
 
 	if (-1 == stat(params->dev_name, &st)) {
 		fprintf(stderr, "Cannot identify '%s': %d, %s\n", params->dev_name, errno, strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	if (!S_ISCHR(st.st_mode)) {
 		fprintf(stderr, "%s is no device\n", params->dev_name);
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	params->fd = open(params->dev_name, O_RDWR /* required */| O_NONBLOCK, 0);
 
 	if (-1 == params->fd) {
 		fprintf(stderr, "Cannot open '%s': %d, %s\n", params->dev_name, errno, strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
+	return 0;
 }
 
 int handle_v4l2(const char *devicefile, int width, int height, int fps, PROCESS_IMAGE_CALLBACK _process_image, void *_user_data) {
-	PARAMS_T params = {};
+	PARAMS_T params = { };
 	params.fd = -1;
 	params.run = 1;
 	params.process_image = _process_image;
@@ -342,7 +342,9 @@ int handle_v4l2(const char *devicefile, int width, int height, int fps, PROCESS_
 	params.height = height;
 	params.fps = fps;
 
-	open_device(&params);
+	if (open_device(&params) < 0) {
+		return -1;
+	}
 	init_device(&params);
 	start_capturing(&params);
 	mainloop(&params);

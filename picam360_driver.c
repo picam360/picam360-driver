@@ -670,6 +670,7 @@ static void add_mpu(MPU_T *mpu) {
 			}
 			MPU_T **current = state->mpus;
 			state->mpus = malloc(sizeof(MPU_T*) * space);
+			memset(state->mpus, 0, sizeof(MPU_T*) * space);
 			memcpy(state->mpus, current, sizeof(MPU_T*) * (i + 1));
 			state->mpus[space - 1] = (void*) -1;
 			free(current);
@@ -698,6 +699,7 @@ static void add_status(STATUS_T *status) {
 			}
 			STATUS_T **current = state->statuses;
 			state->statuses = malloc(sizeof(STATUS_T*) * space);
+			memset(state->statuses, 0, sizeof(STATUS_T*) * space);
 			memcpy(state->statuses, current, sizeof(STATUS_T*) * (i + 1));
 			state->statuses[space - 1] = (void*) -1;
 			free(current);
@@ -726,6 +728,7 @@ static void add_watch(STATUS_T *watch) {
 			}
 			STATUS_T **current = state->watches;
 			state->watches = malloc(sizeof(STATUS_T*) * space);
+			memset(state->watches, 0, sizeof(STATUS_T*) * space);
 			memcpy(state->watches, current, sizeof(STATUS_T*) * (i + 1));
 			state->watches[space - 1] = (void*) -1;
 			free(current);
@@ -754,6 +757,7 @@ static void add_plugin(PLUGIN_T *plugin) {
 			}
 			PLUGIN_T **current = state->plugins;
 			state->plugins = malloc(sizeof(PLUGIN_T*) * space);
+			memset(state->plugins, 0, sizeof(PLUGIN_T*) * space);
 			memcpy(state->plugins, current, sizeof(PLUGIN_T*) * (i + 1));
 			state->plugins[space - 1] = (void*) -1;
 			free(current);
