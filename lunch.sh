@@ -65,8 +65,6 @@ if [ $NUM_OF_CAMERA = "2" ]; then
 ./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video2
 fi
 
-elif [ $CAMERA_TYPE = "USB_8MP" ]; then
-
 fi
 
 #wait for i2c available
