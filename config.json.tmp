@@ -1,5 +1,5 @@
 {
-    "picam360_driver.skip_frame": 2.0,
+    "picam360_driver.skip_frame": 0.0,
     "rov_driver.motor1_dir": -1.0,
     "rov_driver.motor3_dir": -1.0,
     "picam360_driver.video_delay": 0.0,
