@@ -13,9 +13,6 @@
 typedef struct _OPTIONS_T {
 	enum VIDEO_STREAM_TYPE vstream_type[CAMERA_NUM];
 	char v4l2_devicefile[CAMERA_NUM][256];
-	int cam_width[CAMERA_NUM];
-	int cam_height[CAMERA_NUM];
-	int cam_fps[CAMERA_NUM];
 
 	int rtp_rx_port;
 	enum RTP_SOCKET_TYPE rtp_rx_type;
@@ -49,6 +46,11 @@ typedef struct _PICAM360DRIVER_T {
 
 	RTP_T *rtp;
 	RTP_T *rtcp;
+
+	uint32_t cam_width;
+	uint32_t cam_height;
+	uint32_t cam_fps;
+	int num_of_cam;
 
 	char **plugin_paths;
 	PLUGIN_T **plugins;

@@ -387,12 +387,6 @@ static void init_options(PICAM360DRIVER_T *state) {
 			if (lg_camera_offset[i].w == 0) {
 				lg_camera_offset[i].w = 0.8;
 			}
-			sprintf(buff, PLUGIN_NAME ".cam%d_width", i);
-			state->options.cam_width[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, PLUGIN_NAME ".cam%d_height", i);
-			state->options.cam_height[i] = json_number_value(json_object_get(options, buff));
-			sprintf(buff, PLUGIN_NAME ".cam%d_fps", i);
-			state->options.cam_fps[i] = json_number_value(json_object_get(options, buff));
 			{
 				sprintf(buff, PLUGIN_NAME ".cam%d_v4l2_devicefile", i);
 				json_t *value = json_object_get(options, buff);
@@ -524,13 +518,6 @@ static void save_options(PICAM360DRIVER_T *state) {
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].z));
 		sprintf(buff, PLUGIN_NAME ".cam%d_horizon_r", i);
 		json_object_set_new(options, buff, json_real(lg_camera_offset[i].w));
-
-		sprintf(buff, PLUGIN_NAME ".cam%d_width", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_width[i]));
-		sprintf(buff, PLUGIN_NAME ".cam%d_height", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_height[i]));
-		sprintf(buff, PLUGIN_NAME ".cam%d_fps", i);
-		json_object_set_new(options, buff, json_real(state->options.cam_fps[i]));
 
 		if (state->options.v4l2_devicefile[i][0] != 0) {
 			sprintf(buff, PLUGIN_NAME ".cam%d_v4l2_devicefile", i);
@@ -851,11 +838,27 @@ int main(int argc, char *argv[]) {
 // Clear application state
 	memset(state, 0, sizeof(*state));
 	strncpy(state->mpu_type, "manual", 64);
+	state->cam_width = 2048;
+	state->cam_height = 2048;
+	state->cam_fps = 30;
+	state->num_of_cam = 1;
 
 	umask(0000);
 
-	while ((opt = getopt(argc, argv, "v:")) != -1) {
+	while ((opt = getopt(argc, argv, "w:h:f:n:v:")) != -1) {
 		switch (opt) {
+		case 'w':
+			sscanf(optarg, "%d", &state->cam_width);
+			break;
+		case 'h':
+			sscanf(optarg, "%d", &state->cam_height);
+			break;
+		case 'f':
+			sscanf(optarg, "%d", &state->cam_fps);
+			break;
+		case 'n':
+			sscanf(optarg, "%d", &state->num_of_cam);
+			break;
 		case 'v':
 			strncpy(state->mpu_type, optarg, 64);
 			break;
@@ -888,7 +891,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	set_video_mjpeg_xmp_callback(xmp);
-	for (int i = 0; i < CAMERA_NUM; i++) {
+	for (int i = 0; i < state->num_of_cam; i++) {
 		enum VIDEO_STREAM_TYPE type = state->options.vstream_type[i];
 		char filepath[256];
 		if (type == VIDEO_STREAM_TYPE_NONE) {
@@ -898,7 +901,7 @@ int main(int argc, char *argv[]) {
 		} else if (type == VIDEO_STREAM_TYPE_V4L2) {
 			strncpy(filepath, state->options.v4l2_devicefile[i], sizeof(filepath));
 		}
-		init_video_mjpeg(i, type, filepath, state->options.cam_width[i], state->options.cam_height[i], state->options.cam_fps[i], state->rtp, NULL);
+		init_video_mjpeg(i, type, filepath, state->cam_width, state->cam_width, state->cam_fps, state->rtp, NULL);
 	}
 	video_mjpeg_set_skip_frame(0, lg_skip_frame);
 	video_mjpeg_set_skip_frame(1, lg_skip_frame);
