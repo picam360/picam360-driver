@@ -7,8 +7,6 @@ cd $CURRENT
 
 CAM_WIDTH=2048
 CAM_HEIGHT=2048
-#[RASPI,USB,V4L2]
-TYPE=V4L2
 CAM0=0
 CAM1=1
 VIEW_COODINATE=
@@ -23,8 +21,6 @@ do
             ;;
         h)  CAM_HEIGHT=$OPTARG
             ;;
-        t)  TYPE=$OPTARG
-            ;;
         v)  VIEW_COODINATE="-v $OPTARG"
             ;;
         g)  DEBUG=true
@@ -33,6 +29,8 @@ do
             ;;
     esac
 done
+
+if [ $CAMERA_TYPE = "RASPICAM" ]; then
 
 if [ -e cam0 ]; then
 	rm cam0
@@ -45,8 +43,6 @@ if [ -e cam1 ]; then
 fi
 mkfifo cam1
 chmod 0666 cam1
-
-if [ $TYPE = "RASPI" ]; then
 
 sudo killall raspivid
 
@@ -62,28 +58,14 @@ if [ $NUM_OF_CAMERA = "2" ]; then
 
 fi
 
-elif [ $TYPE = "USB" ]; then
-
-sudo killall ffmpeg
-
-CAM_RESOLUTION=${CAM_WIDTH}x${CAM_HEIGHT}
-
-ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video0 -vcodec copy pipe:1.mjpeg > cam0 2> /dev/null &
-
-if [ $NUM_OF_CAMERA = "2" ]; then
-
-ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/video2 -vcodec copy pipe:1.mjpeg > cam1 2> /dev/null &
-
-fi
-
-fi
-
-if [ $CAMERA_TYPE = "USB_WDR" ]; then
+elif [ $CAMERA_TYPE = "USB_WDR" ]; then
 
 ./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video0
 if [ $NUM_OF_CAMERA = "2" ]; then
 ./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video2
 fi
+
+elif [ $CAMERA_TYPE = "USB_8MP" ]; then
 
 fi
 
