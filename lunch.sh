@@ -76,7 +76,9 @@ ffmpeg -r 15 -s $CAM_RESOLUTION -f video4linux2 -input_format mjpeg -i /dev/vide
 
 fi
 
-elif [ $TYPE = "V4L2" ]; then
+fi
+
+if [ $CAMERA_TYPE = "USB_WDR" ]; then
 
 ./tools/Linux_UVC_TestAP/H264_UVC_TestAP --xuset-mjb 30000000 /dev/video0
 if [ $NUM_OF_CAMERA = "2" ]; then

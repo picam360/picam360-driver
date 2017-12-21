@@ -62,7 +62,7 @@
     "rtp_rx_type": "none",
     "rtp_tx_port": 9002,
     "rtp_tx_type": "udp",
-    "rtp_tx_ip": "192.168.4.2",
+    "rtp_tx_ip": "127.0.0.1",
     "rtcp_rx_port": 9003,
     "rtcp_rx_type": "udp",
     "rtcp_tx_port": 0,
