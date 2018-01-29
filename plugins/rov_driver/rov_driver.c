@@ -51,6 +51,7 @@ static float lg_light_strength = 0; //0 to 100
 static float lg_thrust = 0; //-100 to 100
 static float lg_brake_ps = 5; // percent
 static VECTOR4D_T lg_target_quaternion = { .ary = { 0, 0, 0, 1 } };
+static VECTOR4D_T lg_offset_quaternion = { .ary = { 0, 0, 0, 1 } };
 
 static bool lg_lowlevel_control = false;
 static bool lg_pid_enabled = false;
@@ -61,6 +62,10 @@ static float lg_i_gain = 1.0;
 static float lg_d_gain = 1.0;
 static float lg_pid_value[3] = { }; //x, z, delta yaw
 static float lg_delta_pid_target[3][4] = { }; //[history][x, z, delta yaw, t]
+
+static float lg_offset_yaw = 0.0;
+static float lg_offset_pitch = 0.0;
+static float lg_offset_roll = 0.0;
 
 static void release(void *user_data) {
 	free(user_data);
@@ -90,32 +95,28 @@ static void update_pwm() {
 
 	{
 		float value = lg_motor_value[0];
-		value = lg_motor_dir[0] * (value / 100)
-				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[0] * value);
+		value = lg_motor_dir[0] * (value / 100) * lg_motor_range + MOTOR_BASE(lg_motor_dir[0] * value);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[0], value);
 		write(fd, cmd, len);
 	}
 
 	{
 		float value = lg_motor_value[1];
-		value = lg_motor_dir[1] * (value / 100)
-				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[1] * value);
+		value = lg_motor_dir[1] * (value / 100) * lg_motor_range + MOTOR_BASE(lg_motor_dir[1] * value);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[1], value);
 		write(fd, cmd, len);
 	}
 
 	{
 		float value = lg_motor_value[2];
-		value = lg_motor_dir[2] * (value / 100)
-				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[2] * value);
+		value = lg_motor_dir[2] * (value / 100) * lg_motor_range + MOTOR_BASE(lg_motor_dir[2] * value);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[2], value);
 		write(fd, cmd, len);
 	}
 
 	{
 		float value = lg_motor_value[3];
-		value = lg_motor_dir[3] * (value / 100)
-				* lg_motor_range+ MOTOR_BASE(lg_motor_dir[3] * value);
+		value = lg_motor_dir[3] * (value / 100) * lg_motor_range + MOTOR_BASE(lg_motor_dir[3] * value);
 		len = sprintf(cmd, "%d=%fus\n", lg_motor_id[3], value);
 		write(fd, cmd, len);
 	}
@@ -131,6 +132,11 @@ static float sub_angle(float a, float b) {
 	}
 	return v;
 }
+static VECTOR4D_T _get_quaternion(){
+	VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+	quat = quaternion_multiply(quat, lg_offset_quaternion); // Rc=RcoRc
+	return quat;
+}
 
 static bool lg_debugdump = false;
 void *pid_thread_func(void* arg) {
@@ -143,7 +149,7 @@ void *pid_thread_func(void* arg) {
 			continue;
 		}
 
-		VECTOR4D_T quat = lg_plugin_host->get_quaternion();
+		VECTOR4D_T quat = _get_quaternion();
 		if (last_time < 0) { //init last_time
 			last_time = quat.t;
 			continue;
@@ -191,14 +197,11 @@ void *pid_thread_func(void* arg) {
 			float x, y, z;
 			if (lg_debugdump) {
 				quaternion_get_euler(quat, &y, &x, &z, EULER_SEQUENCE_YXZ);
-				printf("vehicle : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI,
-						z * 180 / M_PI);
+				printf("vehicle : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 			if (lg_debugdump) {
-				quaternion_get_euler(lg_target_quaternion, &y, &x, &z,
-						EULER_SEQUENCE_YXZ);
-				printf("target  : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI,
-						z * 180 / M_PI);
+				quaternion_get_euler(lg_target_quaternion, &y, &x, &z, EULER_SEQUENCE_YXZ);
+				printf("target  : %f, %f, %f\n", x * 180 / M_PI, y * 180 / M_PI, z * 180 / M_PI);
 			}
 
 			if (lg_debugdump) {
@@ -206,10 +209,8 @@ void *pid_thread_func(void* arg) {
 			}
 
 			static float last_yaw = 0;
-			lg_delta_pid_target[0][0] = cos(lg_yaw_diff * M_PI / 180)
-					* (lg_pitch_diff / 180); // x [-1:1]
-			lg_delta_pid_target[0][1] = sin(lg_yaw_diff * M_PI / 180)
-					* (lg_pitch_diff / 180); // z [-1:1]
+			lg_delta_pid_target[0][0] = cos(lg_yaw_diff * M_PI / 180) * (lg_pitch_diff / 180); // x [-1:1]
+			lg_delta_pid_target[0][1] = sin(lg_yaw_diff * M_PI / 180) * (lg_pitch_diff / 180); // z [-1:1]
 			lg_delta_pid_target[0][2] = sub_angle(lg_yaw_diff, last_yaw) / 180; // delta yaw [-1:1]
 			lg_delta_pid_target[0][3] = quat.t;
 
@@ -217,16 +218,9 @@ void *pid_thread_func(void* arg) {
 			diff_sec = MAX(MIN(diff_sec, 1.0), 0.001);
 
 			for (int k = 0; k < 3; k++) {
-				float p_value =
-						lg_p_gain
-								* (lg_delta_pid_target[0][k]
-										- lg_delta_pid_target[1][k]);
-				float i_value = lg_i_gain * lg_delta_pid_target[0][k]
-						* diff_sec;
-				float d_value = lg_d_gain
-						* (lg_delta_pid_target[0][k]
-								- 2 * lg_delta_pid_target[1][k]
-								+ lg_delta_pid_target[2][k]) / diff_sec;
+				float p_value = lg_p_gain * (lg_delta_pid_target[0][k] - lg_delta_pid_target[1][k]);
+				float i_value = lg_i_gain * lg_delta_pid_target[0][k] * diff_sec;
+				float d_value = lg_d_gain * (lg_delta_pid_target[0][k] - 2 * lg_delta_pid_target[1][k] + lg_delta_pid_target[2][k]) / diff_sec;
 				float delta_value = p_value + i_value + d_value;
 				lg_pid_value[k] += delta_value;
 				lg_pid_value[k] = MIN(MAX(lg_pid_value[k], -2500), 2500);
@@ -252,8 +246,7 @@ void *pid_thread_func(void* arg) {
 			float motor_pid_value[MOTOR_NUM] = { };
 			for (int k = 0; k < 3; k++) {
 				for (int i = 0; i < MOTOR_NUM; i++) {
-					float power_calib = (lg_pid_value[k] > 0 ? 1 : -1)
-							* sqrt(abs(lg_pid_value[k]));
+					float power_calib = (lg_pid_value[k] > 0 ? 1 : -1) * sqrt(abs(lg_pid_value[k]));
 					motor_pid_value[i] += power_calib * motor_pid_gain[k][i];
 				}
 			}
@@ -352,8 +345,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_thrust : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_strength", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float v;
@@ -364,8 +356,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_light_strength : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_target_quaternion", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_target_quaternion", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float x, y, z, w;
@@ -379,8 +370,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			}
 			printf("set_target_quaternion : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_lowlevel_control", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_lowlevel_control", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -389,8 +379,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			lg_lowlevel_control = (value != 0);
 			printf("set_lowlevel_control : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_pid_enabled", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			float value;
@@ -398,7 +387,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			lg_pid_enabled = (value != 0);
 			lg_thrust = 0;
-			lg_target_quaternion = lg_plugin_host->get_quaternion();
+			lg_target_quaternion = _get_quaternion();
 			memset(lg_pid_value, 0, sizeof(lg_pid_value));
 			memset(lg_delta_pid_target, 0, sizeof(lg_delta_pid_target));
 
@@ -443,8 +432,7 @@ static int command_handler(void *user_data, const char *_buff) {
 
 			printf("set_d_gain : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_light_value", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int id = 0;
@@ -456,8 +444,7 @@ static int command_handler(void *user_data, const char *_buff) {
 			sscanf(param, "%f", &value);
 			printf("set_light_value : completed\n");
 		}
-	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff))
-			== 0) {
+	} else if (strncmp(cmd, PLUGIN_NAME ".set_motor_value", sizeof(buff)) == 0) {
 		char *param = strtok(NULL, " \n");
 		if (param != NULL) {
 			int id = 0;
@@ -488,12 +475,9 @@ static void event_handler(void *user_data, uint32_t node_id, uint32_t event_id) 
 }
 
 static void init_options(void *user_data, json_t *options) {
-	lg_p_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".p_gain"));
-	lg_i_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".i_gain"));
-	lg_d_gain = json_number_value(
-			json_object_get(options, PLUGIN_NAME ".d_gain"));
+	lg_p_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".p_gain"));
+	lg_i_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".i_gain"));
+	lg_d_gain = json_number_value(json_object_get(options, PLUGIN_NAME ".d_gain"));
 
 	for (int i = 0; i < LIGHT_NUM; i++) {
 		char buff[256];
@@ -520,21 +504,28 @@ static void init_options(void *user_data, json_t *options) {
 	}
 	{
 		float value;
-		value = json_number_value(
-				json_object_get(options, PLUGIN_NAME ".motor_center"));
+		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_center"));
 		if (value != 0) {
 			lg_motor_center = value;
 		}
-		value = json_number_value(
-				json_object_get(options, PLUGIN_NAME ".motor_margin"));
+		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_margin"));
 		if (value != 0) {
 			lg_motor_margin = value;
 		}
-		value = json_number_value(
-				json_object_get(options, PLUGIN_NAME ".motor_range"));
+		value = json_number_value(json_object_get(options, PLUGIN_NAME ".motor_range"));
 		if (value != 0) {
 			lg_motor_range = value;
 		}
+	}
+	{
+		lg_offset_yaw = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_yaw"));
+		lg_offset_pitch = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_pitch"));
+		lg_offset_roll = json_number_value(json_object_get(options, PLUGIN_NAME ".offset_roll"));
+
+		lg_offset_quaternion = quaternion_init();
+		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_z(lg_offset_roll));
+		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_x(lg_offset_pitch));
+		lg_offset_quaternion = quaternion_multiply(lg_offset_quaternion, quaternion_get_from_y(lg_offset_yaw));
 	}
 
 	init_pwm(); //need motor ids
@@ -560,12 +551,14 @@ static void save_options(void *user_data, json_t *options) {
 	}
 
 	{
-		json_object_set_new(options, PLUGIN_NAME ".motor_center",
-				json_real(lg_motor_center));
-		json_object_set_new(options, PLUGIN_NAME ".motor_margin",
-				json_real(lg_motor_margin));
-		json_object_set_new(options, PLUGIN_NAME ".motor_range",
-				json_real(lg_motor_range));
+		json_object_set_new(options, PLUGIN_NAME ".motor_center", json_real(lg_motor_center));
+		json_object_set_new(options, PLUGIN_NAME ".motor_margin", json_real(lg_motor_margin));
+		json_object_set_new(options, PLUGIN_NAME ".motor_range", json_real(lg_motor_range));
+	}
+	{
+		json_object_set_new(options, PLUGIN_NAME ".offset_yaw", json_real(lg_offset_yaw));
+		json_object_set_new(options, PLUGIN_NAME ".offset_pitch", json_real(lg_offset_pitch));
+		json_object_set_new(options, PLUGIN_NAME ".offset_roll", json_real(lg_offset_roll));
 	}
 }
 
@@ -606,8 +599,7 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	if (status == STATUS_VAR(light_value)) {
 		snprintf(buff, buff_len, "%f,%f", lg_light_value[0], lg_light_value[1]);
 	} else if (status == STATUS_VAR(motor_value)) {
-		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_motor_value[0],
-				lg_motor_value[1], lg_motor_value[2], lg_motor_value[3]);
+		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_motor_value[0], lg_motor_value[1], lg_motor_value[2], lg_motor_value[3]);
 	} else if (status == STATUS_VAR(light_strength)) {
 		snprintf(buff, buff_len, "%f", lg_light_strength);
 	} else if (status == STATUS_VAR(brake_ps)) {
@@ -615,9 +607,7 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(thrust)) {
 		snprintf(buff, buff_len, "%f", lg_thrust);
 	} else if (status == STATUS_VAR(target_quaternion)) {
-		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_target_quaternion.x,
-				lg_target_quaternion.y, lg_target_quaternion.z,
-				lg_target_quaternion.w);
+		snprintf(buff, buff_len, "%f,%f,%f,%f", lg_target_quaternion.x, lg_target_quaternion.y, lg_target_quaternion.z, lg_target_quaternion.w);
 	} else if (status == STATUS_VAR(lowlevel_control)) {
 		snprintf(buff, buff_len, "%d", lg_lowlevel_control ? 1 : 0);
 	} else if (status == STATUS_VAR(pid_enabled)) {
@@ -633,11 +623,9 @@ static void status_get_value(void *user_data, char *buff, int buff_len) {
 	} else if (status == STATUS_VAR(d_gain)) {
 		snprintf(buff, buff_len, "%f", lg_d_gain);
 	} else if (status == STATUS_VAR(pid_value)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1],
-				lg_pid_value[2]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_pid_value[0], lg_pid_value[1], lg_pid_value[2]);
 	} else if (status == STATUS_VAR(delta_pid_target)) {
-		snprintf(buff, buff_len, "%f,%f,%f", lg_delta_pid_target[0][0],
-				lg_delta_pid_target[0][1], lg_delta_pid_target[0][2]);
+		snprintf(buff, buff_len, "%f,%f,%f", lg_delta_pid_target[0][0], lg_delta_pid_target[0][1], lg_delta_pid_target[0][2]);
 	}
 }
 
