@@ -134,7 +134,7 @@ static float sub_angle(float a, float b) {
 }
 static VECTOR4D_T _get_quaternion(){
 	VECTOR4D_T quat = lg_plugin_host->get_quaternion();
-	quat = quaternion_multiply(quat, lg_offset_quaternion); // Rc=RcoRc
+	quat = quaternion_multiply(quat, lg_offset_quaternion); // Rc=RcRcoRc-1Rc=RcRco
 	return quat;
 }
 
