@@ -58,3 +58,14 @@ target_link_libraries(picam360-driver.bin
 	pthread
 	dl
 )
+
+#plugins
+if(APPLE)
+elseif(UNIX)
+	add_custom_target(plugins
+		COMMAND make -C plugins/mpu9250
+		COMMAND make -C plugins/rov_driver
+	)
+elseif(WIN32)
+	message("WINDOWS")
+endif()

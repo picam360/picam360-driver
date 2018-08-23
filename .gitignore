@@ -29,6 +29,8 @@
 *.app
 
 #cmake
-cmake_install.cmake
+picam360-driver.bin
+Makefile
 CMakeFiles
 CMakeCache.txt
+cmake_install.cmake
