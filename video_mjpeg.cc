@@ -23,10 +23,35 @@ extern "C" {
 #endif
 
 #include "mrevent.h"
+#ifdef ENABLE_V4L2
 #include "v4l2_handler.h"
+#endif
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef _WIN64
+   //define something for Windows (64-bit)
+#elif _WIN32
+   //define something for Windows (32-bit)
+#elif __APPLE__
+    #include "TargetConditionals.h"
+    #if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
+        // define something for simulator
+    #elif TARGET_OS_IPHONE
+        // define something for iphone
+    #else
+        #define TARGET_OS_OSX 1
+        // define something for OSX
+		#define pthread_setname_np(a, b) pthread_setname_np(b)
+    #endif
+#elif __linux
+    // linux
+#elif __unix // all unices not caught above
+    // Unix
+#elif __posix
+    // POSIX
 #endif
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -197,7 +222,7 @@ static void *sendframe_thread_func(void* arg) {
 static void *camx_thread_func_fifo(void* arg) {
 	pthread_setname_np(pthread_self(), "CAM");
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
-	char buff[RTP_MAXPAYLOADSIZE];
+	unsigned char buff[RTP_MAXPAYLOADSIZE];
 	int buff_size = RTP_MAXPAYLOADSIZE;
 
 	int camd_fd = open(send_frame_arg->vstream_filepath, O_RDONLY);
@@ -364,6 +389,7 @@ static void *camx_thread_func_fifo(void* arg) {
 	return NULL;
 }
 
+#ifdef ENABLE_V4L2
 static int v4l2_progress_image(const void *p, int size, void* arg) {
 	_SENDFRAME_ARG_T *send_frame_arg = (_SENDFRAME_ARG_T*) arg;
 
@@ -435,6 +461,8 @@ static void *camx_thread_func_v4l2(void* arg) {
 
 	return NULL;
 }
+#endif
+
 void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const char *vstream_filepath, int width, int height, int fps, RTP_T *rtp, void *user_data) {
 	cam_num = MAX(MIN(cam_num,NUM_OF_CAM-1), 0);
 	if (lg_send_frame_arg[cam_num]) {
@@ -455,8 +483,10 @@ void init_video_mjpeg(int cam_num, enum VIDEO_STREAM_TYPE vstream_type, const ch
 	void *(*start_routine)(void *);
 	if (lg_send_frame_arg[cam_num]->vstream_type == VIDEO_STREAM_TYPE_FIFO) {
 		start_routine = camx_thread_func_fifo;
+#ifdef ENABLE_V4L2
 	} else if (lg_send_frame_arg[cam_num]->vstream_type == VIDEO_STREAM_TYPE_V4L2) {
 		start_routine = camx_thread_func_v4l2;
+#endif
 	} else {
 		return;
 	}
