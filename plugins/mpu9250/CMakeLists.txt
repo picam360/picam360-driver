@@ -23,7 +23,7 @@ add_dependencies(I2Cdev I2Cdev_make)
 
 set_target_properties(I2Cdev
     PROPERTIES
-    IMPORTED_LOCATION libI2Cdev.a)
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libI2Cdev.a)
 
 add_custom_target(MotionSensor_make
 	COMMAND make -C MotionSensor
@@ -33,7 +33,7 @@ add_dependencies(MotionSensor MotionSensor_make)
 
 set_target_properties(MotionSensor
     PROPERTIES
-    IMPORTED_LOCATION MotionSensor/libMotionSensor.a)
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/MotionSensor/libMotionSensor.a)
 
 	
 include_directories(
@@ -48,4 +48,9 @@ target_link_libraries(mpu9250
 	I2Cdev
 	pthread
 	dl
+)
+
+#post build
+add_custom_command(TARGET mpu9250 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:mpu9250> ${CMAKE_CURRENT_SOURCE_DIR}/../
 )

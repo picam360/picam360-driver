@@ -59,13 +59,15 @@ target_link_libraries(picam360-driver.bin
 	dl
 )
 
+option(USE_MPU9250 "Use mpu9250" OFF)
+option(USE_ROV_DRIVER "Use rov_driver" OFF)
+
 #plugins
-if(APPLE)
-elseif(UNIX)
-	add_custom_target(plugins
-		COMMAND make -C plugins/mpu9250
-		COMMAND make -C plugins/rov_driver
-	)
-elseif(WIN32)
-	message("WINDOWS")
+if(USE_MPU9250)
+	message("enable mpu9250")
+	add_subdirectory(plugins/mpu9250)
+endif()
+if(USE_ROV_DRIVER)
+	message("enable rov_driver")
+	add_subdirectory(plugins/rov_driver)
 endif()
