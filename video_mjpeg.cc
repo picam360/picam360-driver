@@ -208,6 +208,7 @@ static void *sendframe_thread_func(void* arg) {
 			rtp_sendpacket(send_frame_arg->rtp, (unsigned char*) packet->data, packet->len,
 			PT_CAM_BASE + send_frame_arg->cam_num);
 			if (packet->eof) {
+				rtp_flush(send_frame_arg->rtp);
 				delete packet;
 				break;
 			} else {
